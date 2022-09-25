@@ -147,6 +147,8 @@ sub parse_config() {
     }
 }
 
+&parse_config();
+
 while (1) {
     &main;
 }
