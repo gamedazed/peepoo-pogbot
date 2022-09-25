@@ -18,9 +18,9 @@ my %streams;
 my %config;
 
 sub main() {
-    my ($vod_id, $chan_name) = &poll();
-    my $fileName             = &record($chan_name, $vod_id);
-    my $merged_file          = &two_as_one($fileName, qq{${$vod_id}-${$chan_name}_chat.mp4}, qq{final_$fileName});
+    my ($vod_id, $channel_name) = &poll();
+    my $fileName             = &record($channel_name, $vod_id);
+    my $merged_file          = &two_as_one($fileName, qq{${$vod_id}-${$channel_name}_chat.mp4}, qq{final_$fileName});
 }
 
 sub poll() {
@@ -40,18 +40,18 @@ sub poll() {
     #####################################################
 
     POLL:
-    foreach my $chan_name (@watch_list) {
-        $fm_poll->start($chan_name) and next POLL;
-        my $vod_id  = &get_live_status($chan_name);
-        $streams{$vod_id}{channel}   = $chan_name;
-        $streams{$chan_name}{vod_id} = $vod_id;
+    foreach my $channel_name (@watch_list) {
+        $fm_poll->start($channel_name) and next POLL;
+        my $vod_id  = &get_live_status($channel_name);
+        $streams{$vod_id}{channel}   = $channel_name;
+        $streams{$channel_name}{vod_id} = $vod_id;
         $fm_poll->finish;
-        return($vod_id, $chan_name);
+        return($vod_id, $channel_name);
     }
 }
 
 sub record() {
-    my $chan_name = shift;
+    my $channel_name = shift;
     my $vod_id    = shift;
     ##################### Callbacks #####################
     $fm_record->run_on_finish(sub {
@@ -64,16 +64,20 @@ sub record() {
     }, 60);
     $fm_record->run_on_start(sub {
         my ($pid, $ident) = @_;
-        &get_chat($vod_id, qq{$vod_id-$chan_name});
+        &get_chat($vod_id, qq{$vod_id-$channel_name});
         print qq{Started recording $streams{$ident}{channel} [$ident] - ($pid)\n};
     });
     #####################################################
+    my %record_live = (
+        stream  =>  qq{my \$filename = \&live_trigger($channel_name, $vod_id)},
+        chat    =>  qq{\&get_chat($vod_id, qq{$vod_id-$channel_name})}
+    );
+
     RECORD:
-    foreach my $chan_name (@watch_list) {
-        $fm_record->start($vod_id) and next RECORD;
-        my $filename = &live_trigger($chan_name, $vod_id);
+    foreach my $input (keys %record_live) {
+        eval{$record_live{$input}} and next RECORD;
         $fm_record->finish;
-        return $filename;
+        return $streams{$channel_name}{filename};
     }
 }
 
@@ -105,7 +109,7 @@ sub live_trigger {
         print qx{youtube-dl -q -o "$filename" https://twitch.tv/$channel_name} :
         print qx{youtube-dl    -o "$filename" https://twitch.tv/$channel_name} ;
     $fm_record->finish;
-    return $filename;
+    $streams{$channel_name}{filename} = $filename;
 }
 
 sub get_chat() {
