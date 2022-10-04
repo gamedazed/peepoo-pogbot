@@ -4,9 +4,9 @@ This tool is designed to poll for liveness from a streamer on Twitch. The channe
 
 - Transcoding Extraordinaire: ffmpeg    (cheers erupt, the crowd's going wild!)
 
-- Downloading Live Stream => youtube-dl
+- Downloading Live Stream => yt-dlp
 
-- Rendering Chat => TwitchDownloaderCLI
+- Rendering Chat => TwitchDownloaderCLI (VOD) | not sure yet (Live) [ probably bot ]
 
 - Detecting Live state of streamer => WWW:Twitch module
 
