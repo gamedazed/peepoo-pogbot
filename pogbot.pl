@@ -39,39 +39,44 @@ use WWW::Twitch;
 my @watch_list = qw{nyanners lordaethelstan};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
+my $configFile = q{pogbot.ini};
 ######## Compatability #########
-
 my $browser        = q{firefox};
 my $envOS          = q{NT};
 my $drive          = q{G};
 $PeePoo::verbosity = q{debug};
 $PeePoo::logLevel  = q{info};
 $PeePoo::logFile   = q{pog.log};
-########## testing #############                                                      ##
-my @testing_args   = qw{-F --no-simulate --allow-unplayable-formats --no-check-formats}; #--test };
+########## testing #############                                                      
+my @testing_args   = qw{-F --no-simulate --allow-unplayable-formats --no-check-formats};
 
 my %streams;
 my %config;
 
+# main program flow
 sub main() {
     my @ffmpeg_args = @_;
-    my ($vod_id, $channel_name) = &poll();
-    &live_trigger($channel_name, @ffmpeg_args);
+    # &parse_ini                            # not ready yet
+    while (scalar(@watch_list)) {
+        my ($vod_id, $channel_name) = &poll();
+        &live_trigger($channel_name, @ffmpeg_args);
+    }
 }
 
+#check each streamer's online state
 sub poll() {
     ############################# Callbacks #############################
     $fm_poll->run_on_finish(sub {
         my ($pid, $returnCode, $ident) = @_;
-        print qq{$ident went live!\n};
+        &PeePoo::printl( q{info}, qq{$ident went live!\n} );
     });
     $fm_poll->run_on_wait(sub {
         my ($pid, $ident) = @_; 
-        print qq{Actively polling for streamers..\n};
+        &PeePoo::printl( q{info}, qq{Actively polling for streamers..\n} );
     }, 5);
     $fm_poll->run_on_start(sub {
         my ($pid, $ident) = @_;
-        print qq{Started polling for $ident - ($pid)!\n};
+        &PeePoo::printl( q{info}, qq{Started polling for $ident - ($pid)!\n} );
     });
     #####################################################################
 
@@ -84,6 +89,7 @@ sub poll() {
     }
 }
 
+# Check if they're online
 sub get_live_status {
     my $channel_name = shift;
     my $twitch = WWW::Twitch->new();
@@ -94,6 +100,8 @@ sub get_live_status {
     return $is_live->{id} if ($is_live);
 }
 
+# Not a longterm solution, command will be dynamically generated around the passed parameters once config and args are able to read.
+# That said, this is the command I have found myself enjoying the most
 sub live_trigger() {
     my $channel_name = shift;
     return undef unless defined $channel_name;
@@ -116,18 +124,36 @@ sub live_trigger() {
     &PeePoo::printxl($omegalulz);
 }
 
+# config changes don't take effect yet
+
 sub parse_ini() {
     my $fn = shift;
     open (my $fh, '<', $fn);
     my @iniConf = <$fh>;
     close $fh;
 
-    foreach my $line (@iniConf) {
+    my $section;
 
+    foreach my $line (@iniConf) {
+        next if $line =~ m/^\s*$/;  # skip empty lines
+        next if $line =~ m/^\s*#$/; # skip lines only containing comments
+        $line =~ s/#.*// if $line =~ m/^\s*[^#]+.*?#/;    # strip comments from kv lines
+        if ($line =~ m/^\s*\[(.*?)\]/) {
+            $section = $1;
+        }
+        elsif ($line =~ m/^\s*(\S.*?)\s*[=:]\s*(\S.*?)\s*$/) {
+            my $param = $1;
+            my $value = $2;
+            if (defined $section) {
+                $config{$section}{$param} = $value;
+            }
+            else {
+                $config{global}{$param} = $value;
+            }
+        }
     }
 }
 
 push @ARGV, $_ foreach (@testing_args);
-while (1) {
-    &main(@ARGV);
-}
+
+&main(@ARGV);
