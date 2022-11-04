@@ -76,6 +76,7 @@ sub decode_base64() {
 
 # does the coloring for printl / printxl
 sub color_code() {
+    use Term::ANSIColor 4.00 qw(:constants);
     my $colorCode = shift;
     my $message   = shift;
     my %color_palette = (
@@ -213,9 +214,8 @@ sub timestamp() {
         "usStdDateTime" =>      q{mm-dd-yyyy_hh:mm:ss},
         "euStdDateTime" =>      q{yyyy-mm-dd_hh:mm:ss},
     );
-    defined $preconfigured{$tsf} ?
-    $converted = &get_tsf($preconfigured{$tsf}) :
-    $converted = &get_tsf($tsf)                 ;
+    $converted = &get_tsf($preconfigured{$tsf}) if  defined $preconfigured{$tsf};
+    $converted = &get_tsf($tsf)             unless  defined $preconfigured{$tsf};
     $converted =~ s/_/T/ if $tsf eq q{iso8601};
     return qx{date $converted | tr -d "\n"};
 }
