@@ -32,24 +32,28 @@ use warnings;
 ###################################################################################################
 
 use lib q{./modules};
+use lib q{/usr/local/lib/perl5/site_perl/5.36.0/x86_64-linux-gnu};
+use lib q{/usr/local/lib/perl5/site_perl/5.36.0};
+use lib q{/usr/local/lib/perl5/vendor_perl/5.36.0/x86_64-linux-gnu};
+use lib q{/usr/local/lib/perl5/vendor_perl/5.36.0};
+use lib q{/usr/local/lib/perl5/5.36.0/x86_64-linux-gnu};
+use lib q{/usr/local/lib/perl5/5.36.0};
 use PeePoo;
 use Parallel::ForkManager;
 use WWW::Twitch;
 
-my @watch_list = qw{nyanners lordaethelstan};
+my @watch_list = qw{Nyanners lordAethelstan};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
 my $configFile = q{pogbot.ini};
-######## Compatability #########
-my $browser        = q{firefox};
-my $envOS          = q{NT};
-my $drive          = q{G};
-$PeePoo::verbosity = q{debug};
-$PeePoo::logLevel  = q{info};
-$PeePoo::logFile   = q{pog.log};
-########## testing #############                                                      
-my @testing_args   = qw{-F --no-simulate --allow-unplayable-formats --no-check-formats};
-
+#################################### Compatability ####################################
+my $browser         =   q{firefox};
+my $impersonateThis =   q{revod-364904@appspot.gserviceaccount.com};
+my $authorization   =   q{~/.boto};
+$PeePoo::verbosity  =   q{debug};
+$PeePoo::logLevel   =   q{info};
+$PeePoo::logFile    =   q{pog.log};
+####################################### testing #######################################
 my %streams;
 my %config;
 
@@ -71,9 +75,9 @@ sub poll() {
         &PeePoo::printl( q{info}, qq{$ident went live!\n} );
     });
     $fm_poll->run_on_wait(sub {
-        my ($pid, $ident) = @_; 
-        &PeePoo::printl( q{info}, qq{Actively polling for streamers..\n} );
-    }, 5);
+        my $pid = shift; 
+        &PeePoo::printl( q{info}, qq{Polling for live streamers . . .\n} );
+    });
     $fm_poll->run_on_start(sub {
         my ($pid, $ident) = @_;
         &PeePoo::printl( q{info}, qq{Started polling for $ident - ($pid)!\n} );
@@ -90,14 +94,14 @@ sub poll() {
 }
 
 # Check if they're online
-sub get_live_status {
+sub get_live_status() {
     my $channel_name = shift;
     my $twitch = WWW::Twitch->new();
     my $is_live;
     until($is_live) {
         $is_live = $twitch->live_stream($channel_name);
     }
-    return $is_live->{id} if ($is_live);
+    return $is_live->{id} if $is_live;
 }
 
 # Not a longterm solution, command will be dynamically generated around the passed parameters once config and args are able to read.
@@ -108,52 +112,31 @@ sub live_trigger() {
     my $args = join(' ', @_);
 
     my $cmd = q{yt-dlp};
+    my $outputDir = qq{/downloads/$channel_name};
     my $ua  = q{Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0};
-    my $omegalulz = qq{$cmd           `
-    --sub-langs live_chat             `
-    --hls-prefer-native               `
-    --allow-dynamic-mpd               `
-    --hls-split-discontinuity         `
-    --concurrent-fragments 5          `
-    --cookies-from-browser $browser   `
-    --write-subs   -vvv               `
-    --user-agent '$ua' $args          `
-    https://twitch.tv/$channel_name   `
-    --wait-for-video 10               };
-
-    &PeePoo::printxl($omegalulz);
+    my $jar = qq{/cookies.sqlite};
+    my $o = qq{-o "$outputDir/subtitle:%(uploader)s-%(title)s.%(ext)s" -o "$outputDir/%(uploader)s-%(title)s.%(ext)s" BaW_j+enozKc --write-subs};
+    my $trigger_command = qq{$cmd                            \
+    --sub-langs live_chat             \
+    --hls-prefer-native               \
+    --allow-dynamic-mpd               \
+    --hls-split-discontinuity         \
+    --concurrent-fragments 5          \
+    --write-subs   -vvv               \
+    --user-agent '$ua'                \
+    --cookies '$jar'                  \
+    https://twitch.tv/$channel_name   \
+    --wait-for-video 10  $o           };
+print "$trigger_command\n";
+    &PeePoo::printxl($trigger_command);
 }
 
-# config changes don't take effect yet
 
-sub parse_ini() {
-    my $fn = shift;
-    open (my $fh, '<', $fn);
-    my @iniConf = <$fh>;
-    close $fh;
-
-    my $section;
-
-    foreach my $line (@iniConf) {
-        next if $line =~ m/^\s*$/;  # skip empty lines
-        next if $line =~ m/^\s*#$/; # skip lines only containing comments
-        $line =~ s/#.*// if $line =~ m/^\s*[^#]+.*?#/;    # strip comments from kv lines
-        if ($line =~ m/^\s*\[(.*?)\]/) {
-            $section = $1;
-        }
-        elsif ($line =~ m/^\s*(\S.*?)\s*[=:]\s*(\S.*?)\s*$/) {
-            my $param = $1;
-            my $value = $2;
-            if (defined $section) {
-                $config{$section}{$param} = $value;
-            }
-            else {
-                $config{global}{$param} = $value;
-            }
-        }
-    }
+sub setup() {
+    &PeePoo::printl(q{info}, "Mounting GCS Fuse.");
+    &PeePoo::printxl(q{gcsfuse --key-file /home/gamedazed/revod-364904-c9d09a09225b.json --log-file /home/gamedazed/gcsfuse.log --debug_gcs --debug_fuse --implicit-dirs transient-peepoo /downloads});
+    &PeePoo::printl(q{info}, qq{Mounting completed.}) unless qx{ls -l /downloads/ | wc -l | tr -d "\n"} == 0; 
 }
 
-push @ARGV, $_ foreach (@testing_args);
-
+&setup();
 &main(@ARGV);
