@@ -62,7 +62,7 @@ sub main() {
     my @ffmpeg_args = @_;
     while (scalar(@watch_list)) {
         my ($vod_id, $channel_name) = &poll();
-        &live_trigger($channel_name, @ffmpeg_args);
+        &live_trigger($channel_name);
     }
 }
 
@@ -115,17 +115,8 @@ sub live_trigger() {
     my $ua  = q{Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0};
     my $jar = qq{/home/gamedazed/cookies.sqlite};
     my $o = qq{-o "$outputDir/subtitle:%(uploader)s-%(title)s.%(ext)s" -o "$outputDir/%(uploader)s-%(title)s.%(ext)s" BaW_j+enozKc --write-subs};
-    my $trigger_command = qq{$cmd                            \
-    --sub-langs live_chat             \
-    --hls-prefer-native               \
-    --allow-dynamic-mpd               \
-    --hls-split-discontinuity         \
-    --concurrent-fragments 5          \
-    --write-subs   -vvv               \
-    --user-agent '$ua'                \
-    --cookies '$jar'                  \
-    https://twitch.tv/$channel_name   \
-    --wait-for-video 10  $o           };
+    my $trigger_command = qq{$cmd --sub-langs live_chat --hls-prefer-native --allow-dynamic-mpd --hls-split-discontinuity --concurrent-fragments 5 --write-subs -vvv  --user-agent '$ua' --cookies '$jar' https://twitch.tv/$channel_name --wait-for-video 10  $o};
+    &PeePoo::printl($trigger_command);
     &PeePoo::printxl($trigger_command);
 }
 
