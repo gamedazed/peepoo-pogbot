@@ -32,14 +32,19 @@ use warnings;
 ###################################################################################################
 
 use lib q{./modules};
+use lib q{/usr/local/lib/perl5/site_perl/5.36.0/x86_64-linux-gnu};
+use lib q{/usr/local/lib/perl5/site_perl/5.36.0};
+use lib q{/usr/local/lib/perl5/vendor_perl/5.36.0/x86_64-linux-gnu};
+use lib q{/usr/local/lib/perl5/vendor_perl/5.36.0};
+use lib q{/usr/local/lib/perl5/5.36.0/x86_64-linux-gnu};
+use lib q{/usr/local/lib/perl5/5.36.0};
 use PeePoo;
 use Parallel::ForkManager;
 use WWW::Twitch;
 
-my @watch_list = qw{nyanners lordaethelstan};
+my @watch_list = qw{nyanners lordaethelstan projektMelody};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
-my $configFile = q{pogbot.ini};
 ######## Compatability #########
 my $browser        = q{firefox};
 my $envOS          = q{NT};
@@ -48,19 +53,30 @@ $PeePoo::verbosity = q{debug};
 $PeePoo::logLevel  = q{info};
 $PeePoo::logFile   = q{pog.log};
 ########## testing #############                                                      
-my @testing_args   = qw{-F --no-simulate --allow-unplayable-formats --no-check-formats};
 
 my %streams;
 my %config;
 
 # main program flow
 sub main() {
-    my @ffmpeg_args = @_;
-    # &parse_ini                            # not ready yet
-    while (scalar(@watch_list)) {
-        my ($vod_id, $channel_name) = &poll();
-        &live_trigger($channel_name, @ffmpeg_args);
-    }
+    print "Here as $streams{pid}{$$}{channel}\n";    
+    while (1) { my ($vod_id, $channel_name) = &poll() }
+    # if ($vod_id || $channel_name) {
+    #     if ($vod_id) {
+    #         print "Here with vod id $vod_id as $streams{pid}{$$}{channel}\n";
+    #         print "I didn't know my channel was $streams{pid}{$$}{channel}" unless $channel_name;
+    #         print "I've also got channel name $channel_name" if $channel_name;
+    #         live_trigger($channel_name) if $vod_id;
+    #     }
+    #     elsif ($channel_name) {
+    #         print "Here with channel name as $streams{pid}{$$}{channel}\n";
+    #         print "I didn't know my channel was $streams{pid}{$$}{channel}" unless $channel_name;
+    #         print "I've also got channel name $channel_name" if $channel_name;
+    #     }
+    # }
+    # else {
+    #      print "Here as $streams{pid}{$$}{channel}\nRecycling through main\n";
+    # }
 }
 
 #check each streamer's online state
@@ -68,12 +84,15 @@ sub poll() {
     ############################# Callbacks #############################
     $fm_poll->run_on_finish(sub {
         my ($pid, $returnCode, $ident) = @_;
+        my $rc = $returnCode >> 8;
         &PeePoo::printl( q{info}, qq{$ident went live!\n} );
     });
     $fm_poll->run_on_wait(sub {
-        my ($pid, $ident) = @_; 
-        &PeePoo::printl( q{info}, qq{Actively polling for streamers..\n} );
-    }, 5);
+        my $pid = shift; 
+        my $channel_name = $streams{pid}{$$}{channel};
+
+        &PeePoo::printl( q{info}, qq{Polling for $channel_name . . .\n} );
+    },15);
     $fm_poll->run_on_start(sub {
         my ($pid, $ident) = @_;
         &PeePoo::printl( q{info}, qq{Started polling for $ident - ($pid)!\n} );
@@ -82,10 +101,14 @@ sub poll() {
 
     POLL:
     foreach my $channel_name (@watch_list) {
-        $fm_poll->start($channel_name) and next POLL;
+        my $pid = $fm_poll->start($channel_name) and next POLL;
+        $streams{channel}{$channel_name}{pid} = $pid;
+        $streams{pid}{$pid}{channel} = $channel_name;
         my $vod_id  = &get_live_status($channel_name);
+        #print "Got $vod_id\n";
         $fm_poll->finish;
-        return($vod_id, $channel_name);
+        #print "Returning Vod ID $vod_id and channel name $channel_name\n";
+        #return($vod_id, $channel_name);
     }
 }
 
@@ -94,66 +117,58 @@ sub get_live_status {
     my $channel_name = shift;
     my $twitch = WWW::Twitch->new();
     my $is_live;
-    until($is_live) {
+    until($is_live->{id}) {
         $is_live = $twitch->live_stream($channel_name);
+        $streams{pid}{$$}{vod_id} = $is_live->{id};
+        $streams{channel}{$channel_name}{vod_id} = $is_live->{id};
+        $streams{vod_id}
     }
-    return $is_live->{id} if ($is_live);
+    &PeePoo::printl(q{info}, qq{$is_live->{id}});
+    my $vod_id = $is_live->{id};
+    &PeePoo::printl(q{info},qq{$channel_name went live under vod id $vod_id\n});
+    live_trigger($channel_name);
+    return $vod_id;
 }
 
 # Not a longterm solution, command will be dynamically generated around the passed parameters once config and args are able to read.
 # That said, this is the command I have found myself enjoying the most
 sub live_trigger() {
+
     my $channel_name = shift;
     return undef unless defined $channel_name;
-    my $args = join(' ', @_);
+    chomp $channel_name;
+    print "Peparing to record stream for $channel_name";
 
     my $cmd = q{yt-dlp};
+    my $outputDir = qq{/downloads/$channel_name};
+    print qx{mkdir -v $outputDir} unless -d $outputDir;
     my $ua  = q{Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0};
-    my $omegalulz = qq{$cmd           `
-    --sub-langs live_chat             `
-    --hls-prefer-native               `
-    --allow-dynamic-mpd               `
-    --hls-split-discontinuity         `
-    --concurrent-fragments 5          `
-    --cookies-from-browser $browser   `
-    --write-subs   -vvv               `
-    --user-agent '$ua' $args          `
-    https://twitch.tv/$channel_name   `
-    --wait-for-video 10               };
-
-    &PeePoo::printxl($omegalulz);
+    my $jar = qq{/home/gamedazed/cookies.sqlite};
+    my $o = qq{-o "$outputDir/subtitle:%(uploader)s-%(title)s.%(ext)s" -o "$outputDir/%(uploader)s-%(title)s.%(ext)s" BaW_j+enozKc};
+    my $trigger_command = q{                 \
+    --sub-langs live_chat                    \
+    --hls-prefer-native                      \
+    --allow-dynamic-mpd                      \
+    --hls-split-discontinuity                \
+    --concurrent-fragments 5                 \
+    --write-subs   -vvv                      \
+    --user-agent '} . $ua  . q{'             \
+    --cookies '}    . $jar . q{'             \
+    https://twitch.tv/} . $channel_name . q{ \
+    --wait-for-video 10 } . $o        ;
+    &PeePoo::printl(q{debug}, qq{$cmd $trigger_command});
+    &PeePoo::printxl(qq{$cmd $trigger_command});
 }
 
 # config changes don't take effect yet
 
-sub parse_ini() {
-    my $fn = shift;
-    open (my $fh, '<', $fn);
-    my @iniConf = <$fh>;
-    close $fh;
-
-    my $section;
-
-    foreach my $line (@iniConf) {
-        next if $line =~ m/^\s*$/;  # skip empty lines
-        next if $line =~ m/^\s*#$/; # skip lines only containing comments
-        $line =~ s/#.*// if $line =~ m/^\s*[^#]+.*?#/;    # strip comments from kv lines
-        if ($line =~ m/^\s*\[(.*?)\]/) {
-            $section = $1;
-        }
-        elsif ($line =~ m/^\s*(\S.*?)\s*[=:]\s*(\S.*?)\s*$/) {
-            my $param = $1;
-            my $value = $2;
-            if (defined $section) {
-                $config{$section}{$param} = $value;
-            }
-            else {
-                $config{global}{$param} = $value;
-            }
-        }
-    }
+sub setup() {
+    &PeePoo::printl(q{info}, "Mounting GCS Fuse.");
+    &PeePoo::printxl(q{gcsfuse --key-file /home/gamedazed/revod-364904-c9d09a09225b.json --log-file /home/gamedazed/gcsfuse.log --debug_gcs --debug_fuse --debug_http --implicit-dirs transient-peepoo /downloads});
+    &PeePoo::printl(q{info}, qq{Mounting completed.}) unless qx{ls -l /downloads/ | wc -l | tr -d "\n"} == 0; 
 }
 
-push @ARGV, $_ foreach (@testing_args);
-
+#&setup();
+my $pid = $$;
+$streams{pid}{$pid}{channel} = q{Parent};
 &main(@ARGV);
