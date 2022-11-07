@@ -35,7 +35,7 @@ package PeePoo;
 ###################################################################################################
 use Exporter qw{import};
 our @export = qw{api_call color_code encode_base64 decode_base64 printxl printl log timestamp strip_ws color};
-use Term::ANSIColor;    #(qw{constants}); # apparently not a thing anymore https://perldoc.perl.org/Term::ANSIColor#COMPATIBILITY )
+use Term::ANSIColor (qw{:constants}); # apparently not a thing anymore https://perldoc.perl.org/Term::ANSIColor#COMPATIBILITY )
 
 our $verbosity       = q{debug};
 our $logLevel        = q{debug};
