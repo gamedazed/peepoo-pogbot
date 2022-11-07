@@ -50,6 +50,6 @@ COPY modules/PeePoo.pm                    /home/gamedazed/modules/PeePoo.pm
 
 #(13)* Start off in user home, starting off on shell for sanity checks
 WORKDIR                                   /home/gamedazed/
-ENTRYPOINT [ "/bin/bash"]
-#CMD  [ "perl", "/home/gamedazed/pogbot.pl" ]
+#ENTRYPOINT [ "/bin/bash"]
+CMD  [ "perl", "/home/gamedazed/pogbot.pl" ]
 
