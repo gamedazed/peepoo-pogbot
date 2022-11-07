@@ -35,7 +35,7 @@ package PeePoo;
 ###################################################################################################
 use Exporter qw{import};
 our @export = qw{api_call color_code encode_base64 decode_base64 printxl printl log timestamp strip_ws color};
-use Term::ANSIColor;    #(qw{constants}); # apparently not a thing anymore https://perldoc.perl.org/Term::ANSIColor#COMPATIBILITY )
+use Term::ANSIColor (qw{:constants});    #(qw{constants}); # apparently not a thing anymore https://perldoc.perl.org/Term::ANSIColor#COMPATIBILITY )
 
 our $verbosity       = q{debug};
 our $logLevel        = q{debug};
@@ -213,9 +213,9 @@ sub timestamp() {
         "usStdDateTime" =>      q{mm-dd-yyyy_hh:mm:ss},
         "euStdDateTime" =>      q{yyyy-mm-dd_hh:mm:ss},
     );
-    defined $preconfigured{$tsf} ?
-    $converted = &get_tsf($preconfigured{$tsf}) :
-    $converted = &get_tsf($tsf)                 ;
+    defined $preconfigured{$tsf};
+    $converted = &get_tsf($preconfigured{$tsf}) if $preconfigured{$tsf};
+    $converted = &get_tsf($tsf)             unless $preconfigured{$tsf};
     $converted =~ s/_/T/ if $tsf eq q{iso8601};
     return qx{date $converted | tr -d "\n"};
 }
