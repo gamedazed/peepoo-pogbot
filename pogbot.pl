@@ -42,21 +42,7 @@ use PeePoo;
 use Parallel::ForkManager;
 use WWW::Twitch;
 
-<<<<<<< HEAD
-my @watch_list = qw{nyanners lordaethelstan projektMelody nightmareNexus};
-my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
-
-######## Compatability #########
-my $browser        = q{firefox};
-my $envOS          = q{NT};
-my $drive          = q{G};
-$PeePoo::verbosity = q{debug};
-$PeePoo::logLevel  = q{info};
-$PeePoo::logFile   = q{pog.log};
-########## testing #############                                                      
-
-=======
-my @watch_list = qw{Nyanners lordAethelstan};
+my @watch_list = qw{nyanners lordaethelstan};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
 my $configFile = q{pogbot.ini};
@@ -67,14 +53,13 @@ my $authorization   =   q{~/.boto};
 $PeePoo::verbosity  =   q{debug};
 $PeePoo::logLevel   =   q{info};
 $PeePoo::logFile    =   q{pog.log};
-####################################### testing #######################################
->>>>>>> e0d50c46cef0c6e7f0b309961553a9e198b36945
+####################################### testing #######################################                                                 
+
 my %streams;
 my %config;
 
 # main program flow
 sub main() {
-<<<<<<< HEAD
     print "Here as $streams{pid}{$$}{channel}\n";    
     while (1) { my ($vod_id, $channel_name) = &poll() }
     # if ($vod_id || $channel_name) {
@@ -93,13 +78,6 @@ sub main() {
     # else {
     #      print "Here as $streams{pid}{$$}{channel}\nRecycling through main\n";
     # }
-=======
-    my @ffmpeg_args = @_;
-    while (scalar(@watch_list)) {
-        my ($vod_id, $channel_name) = &poll();
-        &live_trigger($channel_name);
-    }
->>>>>>> e0d50c46cef0c6e7f0b309961553a9e198b36945
 }
 
 #check each streamer's online state
@@ -112,23 +90,26 @@ sub poll() {
     });
     $fm_poll->run_on_wait(sub {
         my $pid = shift; 
-<<<<<<< HEAD
-        my $channel_name = $streams{pid}{$$}{channel};
-
-        &PeePoo::printl( q{info}, qq{Polling for $channel_name . . .\n} ) unless $channel_name =~ m/Parent/i;
-    },15);
-=======
-        &PeePoo::printl( q{info}, qq{Polling for live streamers . . .\n} );
-    });
->>>>>>> e0d50c46cef0c6e7f0b309961553a9e198b36945
+        # Print files modified over the past 1800 minutes
+        &PeePoo::printxl(q{echo && find /downloads/ -type f -mmin -1800 -exec ls -l {} \;});
+        # Show actively running yt-dlp processes
+        &PeePoo::printxl(q{echo && ps aux | grep yt-dlp | grep -v grep }) if qx{ps aux | grep yt-dlp | grep -v grep | wc -l | tr -d "\n"} > 0;
+    },180);
     $fm_poll->run_on_start(sub {
         my ($pid, $ident) = @_;
         &PeePoo::printl( q{info}, qq{Started polling for $ident - ($pid)!\n} );
     });
     #####################################################################
-
+    my $channel = shift;
+    my @channels;
+    if (defined $channel) {
+        push @channels, $_ foreach (split(/,/, $channel));
+    }
+    else {
+        @channels = @watch_list;
+    }
     POLL:
-    foreach my $channel_name (@watch_list) {
+    foreach my $channel_name (@channels) {
         my $pid = $fm_poll->start($channel_name) and next POLL;
         $streams{channel}{$channel_name}{pid} = $pid;
         $streams{pid}{$pid}{channel} = $channel_name;
@@ -141,7 +122,7 @@ sub poll() {
 }
 
 # Check if they're online
-sub get_live_status() {
+sub get_live_status {
     my $channel_name = shift;
     my $twitch = WWW::Twitch->new();
     my $is_live;
@@ -150,14 +131,10 @@ sub get_live_status() {
         $streams{pid}{$$}{vod_id} = $is_live->{id};
         $streams{channel}{$channel_name}{vod_id} = $is_live->{id};
     }
-<<<<<<< HEAD
     &PeePoo::printl(q{info}, qq{$is_live->{id}});
     my $vod_id = $is_live->{id};
     live_trigger($channel_name);
     return $vod_id;
-=======
-    return $is_live->{id} if $is_live;
->>>>>>> e0d50c46cef0c6e7f0b309961553a9e198b36945
 }
 
 # Not a longterm solution, command will be dynamically generated around the passed parameters once config and args are able to read.
@@ -170,7 +147,6 @@ sub live_trigger() {
 
     my $cmd = q{yt-dlp};
     my $outputDir = qq{/downloads/$channel_name};
-<<<<<<< HEAD
     print qx{mkdir -v $outputDir} unless -d $outputDir;
     my $ua  = q{Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0};
     my $jar = qq{/home/gamedazed/cookies.sqlite};
@@ -189,6 +165,7 @@ sub live_trigger() {
     &PeePoo::printl(q{debug}, qq{$cmd $trigger_command});
     my ($executionStatus, $returnOutput, $returnCode) = &PeePoo::printxl(qq{$cmd $trigger_command});
     &PeePoo::printl(q{info}, qq{Stream download exited with returncode $returnCode and status $executionStatus\n});
+    &poll($channel_name);
 }
 
 sub setup() {
@@ -197,26 +174,7 @@ sub setup() {
     &PeePoo::printl(q{info}, qq{Mounting completed.}) unless qx{ls -l /downloads/ | wc -l | tr -d "\n"} == 0; 
 }
 
-#&setup();
+&setup();
 my $pid = $$;
 $streams{pid}{$pid}{channel} = q{Parent};
 &main(@ARGV);
-=======
-    my $ua  = q{Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0};
-    my $jar = qq{/home/gamedazed/cookies.sqlite};
-    my $o = qq{-o "$outputDir/subtitle:%(uploader)s-%(title)s.%(ext)s" -o "$outputDir/%(uploader)s-%(title)s.%(ext)s" BaW_j+enozKc --write-subs};
-    my $trigger_command = qq{$cmd --sub-langs live_chat --hls-prefer-native --allow-dynamic-mpd --hls-split-discontinuity --concurrent-fragments 5 --write-subs -vvv  --user-agent '$ua' --cookies '$jar' https://twitch.tv/$channel_name --wait-for-video 10  $o};
-    &PeePoo::printl($trigger_command);
-    &PeePoo::printxl($trigger_command);
-}
-
-
-sub setup() {
-    &PeePoo::printl(q{info}, "Mounting GCS Fuse.");
-    &PeePoo::printxl(q{gcsfuse --key-file /home/gamedazed/revod-364904-c9d09a09225b.json --log-file /home/gamedazed/gcsfuse.log --debug_gcs --debug_fuse --implicit-dirs transient-peepoo /downloads});
-    &PeePoo::printl(q{info}, qq{Mounting completed.}) unless qx{ls -l /downloads/ | wc -l | tr -d "\n"} == 0; 
-}
-
-&setup();
-&main(@ARGV);
->>>>>>> e0d50c46cef0c6e7f0b309961553a9e198b36945
