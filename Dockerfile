@@ -39,7 +39,7 @@ RUN cpanm WWW::Twitch Parallel::ForkManager
 
 #(9) #* Login to Twitch from Firefox, stage the cookies in your build directory, skip ads
 COPY cookies.sqlite                       /root/cookies.sqlite
-
+COPY Dockerfile.stream                    /root/Dockerfile.stream
 #(10) #* This is going to be your Service Account Credential File for the Google Cloud Project 
 # that Storage is managed under. # NOTE: If this is ever considered for wider distribution
 # I should consider changing this to an environment variable since it won't be the same twice
@@ -47,13 +47,10 @@ COPY revod-364904-c9d09a09225b.json       /root/revod-364904-c9d09a09225b.json
 
 #(11) #* This is our script. It runs the show.
 COPY pogbot.pl                            /root/pogbot.pl
-#Isaac's verison of the script :) 
-COPY graceful_halt.sh                     /root/graceful_halt.sh
 
 #(12) #* This is our utility module. The script won't run without it. Mostly there for logging and output.
 COPY modules/PeePoo.pm                    /root/modules/PeePoo.pm
 
-#(13) #* Start off in user home, starting off on shell for sanity checks
 WORKDIR                                   /root/
 ########################################################################################################
 RUN chmod +x pogbot.pl
