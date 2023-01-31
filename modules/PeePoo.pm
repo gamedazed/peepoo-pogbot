@@ -34,8 +34,9 @@ package PeePoo;
 # G#&&&&###BBBBBBBBBBGGGGGGGGPPPP55PPPGGGBBBBGPGGBGGGP5555PGGGGGGGGGGGBBBBB##########&&&&&BY^.        
 ###################################################################################################
 use Exporter qw{import};
+use lib q{/usr/local/share/perl/5.30.0};
 our @export = qw{api_call color_code encode_base64 decode_base64 printxl printl log timestamp strip_ws color};
-use Term::ANSIColor (qw{:constants}); # apparently not a thing anymore https://perldoc.perl.org/Term::ANSIColor#COMPATIBILITY )
+use Term::ANSIColor (qw{:constants});    #(qw{constants}); # apparently not a thing anymore https://perldoc.perl.org/Term::ANSIColor#COMPATIBILITY )
 
 our $verbosity       = q{debug};
 our $logLevel        = q{debug};
@@ -76,7 +77,6 @@ sub decode_base64() {
 
 # does the coloring for printl / printxl
 sub color_code() {
-    use Term::ANSIColor 4.00 qw(:constants);
     my $colorCode = shift;
     my $message   = shift;
     my %color_palette = (
@@ -214,8 +214,8 @@ sub timestamp() {
         "usStdDateTime" =>      q{mm-dd-yyyy_hh:mm:ss},
         "euStdDateTime" =>      q{yyyy-mm-dd_hh:mm:ss},
     );
-    $converted = &get_tsf($preconfigured{$tsf}) if  defined $preconfigured{$tsf};
-    $converted = &get_tsf($tsf)             unless  defined $preconfigured{$tsf};
+    $converted = &get_tsf($preconfigured{$tsf}) if $preconfigured{$tsf};
+    $converted = &get_tsf($tsf)             unless $preconfigured{$tsf};
     $converted =~ s/_/T/ if $tsf eq q{iso8601};
     return qx{date $converted | tr -d "\n"};
 }
@@ -338,6 +338,69 @@ sub strip_ws() {
         return $out;
     }
     return undef;
+}
+
+sub rsync_xfer(){
+    my $source = shift;
+    my $destination = shift;
+    my $options = shift;
+    my $command = q{rsync };
+    $command .= &option_heiphenate(qq{--$_ }) foreach (@{$$options{bool}});
+    $command .= &option_heiphenate(qq{--$_=$$options{paramd}{$_}} ) foreach (keys %{$$options{paramd}});
+    $command .= &option_heiphenate(q{vv }) if $PeePoo::verbosity eq q{debug};
+    $command .= &option_heiphenate(q{v }) if $PeePoo::verbosity eq q{info};
+    $command .= qq{$source $destination};
+
+    &PeePoo::printxl(q{debug}, qq{Running $command});
+
+    my ($status, $output, $rc) = &PeePoo::printxl($command);
+
+    my %rc_lookup = (
+        0    =>  q{success},
+        1    =>  q{Syntax / Usage Error},
+        2    =>  q{Protocol Incompatibility},
+        3    =>  q{Errors selecting input/output files, dirs},
+        4    =>  q{Requested action not supported: an attempt was made to manipulate 64-bit files on a platform that cannot support them; or an option was specified that is supported by the client and not by the server.},
+        5    =>  q{Error starting client-server protocol},
+        6    =>  q{Daemon unable to append to log-file},
+        10   =>  q{Error in socket I/O},
+        11   =>  q{Error in file I/O},
+        12   =>  q{Error in rsync protocol data stream},
+        13   =>  q{Errors with program diagnostics},
+        14   =>  q{Error in IPC code},
+        20   =>  q{Received SIGUSR1 or SIGINT},
+        21   =>  q{Some error returned by waitpid()},
+        22   =>  q{Error allocating core memory buffers},
+        23   =>  q{Partial transfer due to error},
+        24   =>  q{Partial transfer due to vanished source files},
+        25   =>  q{The --max-delete limit stopped deletions},
+        30   =>  q{Timeout in data send/receive},
+        35   =>  q{Timeout waiting for daemon connection},
+    );
+    $status .= qq{\n$rc_lookup{$rc}};
+    return $rc;
+}
+
+sub option_heiphenate() {
+    my $paramName  = shift;
+    my $paramValue = shift;
+    if (length($paramName) == 1) {
+        if (defined $paramValue) {
+            return qq{-$paramName $paramValue}
+        }
+        else {
+            return qq{-$paramName}
+        }
+    }
+    else {
+        if (defined $paramValue) {
+            return qq{--$paramName=$paramValue};
+        }
+        else {
+            return qq{--$paramName};
+        }
+    }
+    return &PeePoo::printl(q{warning}, qq{Didn't determine what kind of heiphenation was appropriate here ($paramName)});
 }
 
 $| = 1;
