@@ -75,6 +75,33 @@ sub decode_base64() {
     return qx{echo "$input" | base64 -d | tr -d "\n"};
 }
 
+sub stage_env() {
+    my $env = shift;
+    my $path = shift;
+    unless ($path =~ m!/\.env\s*$!) {
+        if (-d $path) {
+            $path =~ m!/$/!   ?
+              $path .= q{/.env} :
+              $path .= q{.env}  ;
+        }
+        else {
+            if ($ENV{make_missing_paths}) {
+                system(qq{mkdir -pv $path});
+                &stage_env($env, $path);
+            }
+            else {
+                die qq{Path $path does not exist}
+            }
+            
+        }
+    }
+    system(touch $path) unless -f $path;
+    open (my $fh, '>', $path);
+    print $fh qq{$_=$$env{$_}\n} foreach (keys %$env);
+    close $fh;
+    return $path;
+}
+
 # does the coloring for printl / printxl
 sub color_code() {
     my $colorCode = shift;
@@ -351,9 +378,9 @@ sub rsync_xfer(){
     $command .= &option_heiphenate(q{v }) if $PeePoo::verbosity eq q{info};
     $command .= qq{$source $destination};
 
-    &PeePoo::printxl(q{debug}, qq{Running $command});
-
-    my ($status, $output, $rc) = &PeePoo::printxl($command);
+    #&PeePoo::printl(q{debug}, qq{Running $command});
+    return $command
+    #my ($status, $output, $rc) = &PeePoo::printxl($command);
 
     my %rc_lookup = (
         0    =>  q{success},
@@ -377,8 +404,8 @@ sub rsync_xfer(){
         30   =>  q{Timeout in data send/receive},
         35   =>  q{Timeout waiting for daemon connection},
     );
-    $status .= qq{\n$rc_lookup{$rc}};
-    return $rc;
+    #$status .= qq{\n$rc_lookup{$rc}};
+    #return $rc;
 }
 
 sub option_heiphenate() {

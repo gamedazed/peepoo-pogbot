@@ -20,6 +20,9 @@ ARG CACHEBREAK=1
 ## Install yt-dlp
 ENV BUILD_VERSION 2022.10.04
 
+# mount fuse bucket
+RUN gcloud auth login
+
 #(6) #* Install release version $BUILD_VERSION of yt-dlp
 RUN apk add --update ca-certificates curl python3 perl perl-utils perl-app-cpanminus apkbuild-cpan perl-cpanel-json-xs perl-test-cpan-meta perl-cpan-meta-check perl-inc-latest perl-template-toolkit perl-module-build perl-test-leaktrace && \
   rm -rf /var/cache/apk/*                           && \
