@@ -107,8 +107,6 @@ sub get_live_status {
     my $is_live;
     until($is_live->{id}) {
         $is_live = $twitch->live_stream($channel_name);
-        $streams{pid}{$$}{vod_id} = $is_live->{id};
-        $streams{channel}{$channel_name}{vod_id} = $is_live->{id};
     }
     &PeePoo::printl(q{info}, qq{$is_live->{id}});
     my $vod_id = $is_live->{id};
@@ -359,6 +357,25 @@ sub copy_to_gcs() {
     return &PeePoo::rsync_xfer($source, $destination, $options)
 }
 ##################################################################################
+
+sub post_notification() {
+    use WebService::Discord::Webhook;
+    my $channel_name = shift;
+    my $video = shift;
+
+    my $dev_discord_url = q{https://discord.com/api/webhooks/1099773546764439674/TsTz8jvEse8fUiJ6Rfzq52nkXbZwcfs3VMnjmPBYXwCebiC6QZK2JlNLiEnQ5zi-nvnt};
+    my $storage_bucket_pubDir = qq{https://storage.googleapis.com/transient-peepoo/$channel_name};
+
+    my $uriTitle = &PeePoo::uri_encode($video);
+    my $link = qq{$storage_bucket_pubDir/$uriTitle};
+
+    my $notification = qq{$video\n$link};
+
+    my $hook = WebService::Discord::Webhook->new( $dev_discord_url );
+    $hook->get();
+
+    $hook->execute( content => $notification );
+}
 
 $streams{pid}{$$}{channel} = q{Parent};
 &prune_headless_chromium();
