@@ -363,7 +363,7 @@ sub post_notification() {
     my $channel_name = shift;
     my $video = shift;
 
-    my $dev_discord_url = q{https://discord.com/api/webhooks/1099773546764439674/TsTz8jvEse8fUiJ6Rfzq52nkXbZwcfs3VMnjmPBYXwCebiC6QZK2JlNLiEnQ5zi-nvnt};
+    my $dev_discord_url = qx{cat $home/.webhook | tr -d "\n"};
     my $storage_bucket_pubDir = qq{https://storage.googleapis.com/transient-peepoo/$channel_name};
 
     my $uriTitle = &PeePoo::uri_encode($video);
