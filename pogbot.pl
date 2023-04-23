@@ -1,3 +1,4 @@
+gamedazed@instance-2:~$ cat pogbot.pl
 #! /usr/bin/perl
 
 use strict;
@@ -31,13 +32,13 @@ use warnings;
 # G#&&&&###BBBBBBBBBBGGGGGGGGPPPP55PPPGGGBBBBGPGGBGGGP5555PGGGGGGGGGGGBBBBB##########&&&&&BY^.        
 ###################################################################################################
 
-use lib q{./modules};
+use lib q{/home/gamedazed/modules};
 use lib q{/usr/local/share/perl/5.30.0};
 use PeePoo;
 use Parallel::ForkManager;
 use WWW::Twitch;
 
-my @watch_list = qw{lordaethelstan nyanners};
+my @watch_list = qw{lordaethelstan};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
 #my $configFile = q{pogbot.ini};
@@ -73,23 +74,15 @@ my %streams=(
 );
 my %config;
 
-# main program flow
+# main loop
 sub main() {
     while (1) { 
-        # First, poll for watched channels going live. 
-        # When they go live, we'll get the live stream's ID and the channel's name.
         my ($vod_id, $channel_name) = &poll();
-
-        # 
         &live_trigger($channel_name) if ($vod_id && $channel_name);
-
-        # my ($executionStatus, $returnOutput, $returnCode) = &PeePoo::printxl($post_processing_cmd);
-        # spin up a container as non-root, share volume, mount gcs, transfer vod, do cleanup
-        # mix in lots more tests throughout
     }
 }
 
-#check each streamer's online state
+#check each streamer's online state and provide status on files being generated
 sub poll() {
     ############################# Callbacks #############################
     $fm_poll->run_on_finish(sub {
@@ -158,12 +151,12 @@ sub get_watchbot_cmd() {
 
     my $ua  = q{Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0};
     my $jar = qq{/$home/cookies.sqlite};
-    my $ts  = &PeePoo::timestamp(q{yyyy-mm-dd_hh:mm});
-    my $o   = qq{ -o "$outputDir/$ts-%(uploader)s-%(description)s.%(ext)s"};
+    my $o   = qq{ -o "$outputDir/%(uploader)s-%(description)s.%(ext)s"};
 
-    my $cmd = qq{docker run --rm --name=${channel_name}-peepoowatchbot } .
-      q{-e running_application='yt-dlp' --network 'shitting_and_farting' } .
-      q{-v nas_share:/nas jauderho/yt-dlp:latest};
+    # my $cmd = qq{docker run --rm --name=${channel_name}-peepoowatchbot } .
+    #   q{-e running_application='yt-dlp' --network 'shitting_and_farting' } .
+    #   q{jauderho/yt-dlp:latest};
+    my $cmd = q{yt-dlp};
     my $trigger_command = q{                 \
     --sub-langs live_chat                    \
     --hls-prefer-native                      \
@@ -172,9 +165,9 @@ sub get_watchbot_cmd() {
     --concurrent-fragments 5                 \
     --write-subs   -vvv                      \
     --user-agent '} . $ua  . q{'             \
-    --cookies '}    . $jar . q{'             \
+    --cookies }    . $jar . q{               \
     https://twitch.tv/} . $channel_name . q{ \
-    --wait-for-video 10 } . $o               ;
+    --wait-for-video 1 } . $o               ;
 
     &PeePoo::printl(q{debug}, qq{\n\n(watchbot command):\n$cmd $trigger_command\n\n});
     return qq{$cmd $trigger_command}
@@ -185,17 +178,18 @@ sub get_chatdownload_cmd() {
     my $outputDir    = shift;
     my $outputFile   = shift;
     my $vod_id       = shift;
-    my $cmd = qq{docker run --rm -it }            
-    . qq{--name "$channel_name-peepootwitchybot" }
-    . qq{-e running_application='twitch-downloader-cli' }
-    . qq{--network 'shitting_and_farting' -v nas_share:/nas/ }
-    . qq{ bxggs/twitch-downloader-cli:latest }
-    . qq{chatdownload }
+    # my $cmd = qq{docker run --rm -it }            
+    # . qq{--name "$channel_name-peepootwitchybot" }
+    # . qq{-e running_application='twitch-downloader-cli' }
+    # . qq{--network 'shitting_and_farting' -v nas_share:/nas/ }
+    # . qq{ bxggs/twitch-downloader-cli:latest };
+    my $cmd = q{TwitchDownloaderCLI};
+    my $trigger_command = qq{ chatdownload }
     . qq{-u $vod_id }
     . qq{--embed-images }
     . qq{-o "$outputDir/$outputFile" };
     &PeePoo::printl(q{debug}, qq{\n\n(chat download command):\n$cmd\n\n});
-    return $cmd;
+    return $cmd . $trigger_command;
 }
 
 sub get_chatrender_cmd() {
@@ -203,18 +197,20 @@ sub get_chatrender_cmd() {
     my $outputDir     = shift;
     my $chatIn        = shift;
     my $chatOut       = shift;
-    my $cmd = qq{docker run --rm -it }
-    . qq{--name "$channel_name-peepootwitchybot" }
-    . qq{-e running_application='twitch-downloader-cli' }
-    . qq{--network 'shitting_and_farting' -v nas_share:/nas/ }
-    . qq{ bxggs/twitch-downloader-cli:latest }
-    . qq{chatrender }
+    # my $cmd = qq{docker run --rm -it }
+    # . qq{--name "$channel_name-peepootwitchybot" }
+    # . qq{-e running_application='twitch-downloader-cli' }
+    # . qq{--network 'shitting_and_farting' -v nas_share:/nas/ }
+    # . qq{ bxggs/twitch-downloader-cli:latest };
+    my $cmd = q{TwitchDownloaderCLI };
+    my $trigger_command = qq{chatrender }
     . qq{-i "$outputDir/$chatIn" }
     . qq{--outline }
     . qq{-h 1080 -w 422  }
-	. qq{--output "$outputDir/$chatOut"};
+        . qq{--output "$outputDir/$chatOut"};
     &PeePoo::printl(q{debug}, qq{\n\n(twitchify command):\n$cmd\n\n});
-    return $cmd;
+
+    return $cmd . $trigger_command;
 }
 
 sub get_vod_cmd() {
@@ -223,104 +219,60 @@ sub get_vod_cmd() {
     my $chat         = shift;
     my $video        = shift;
     my $vod          = shift;
-
-    my $cmd =
-    # qq{docker run --rm -it                                         \
-    #--name $channel_name-pogvodbot                                  \
-    #-e running_application='ffmpeg'                                 \
-    #--network 'shitting_and_farting' -v nas_share:/nas/             \
-    # xychelsea/ffmpeg-nvidia:latest                                 \
-    qq{ffmpeg                                                        \
-    -y -fps_mode 0 -hwaccel cuvid                                    \
-    -i "$outputDir/$video"                                           \
-    -i "$outputDir/$chat"                                            \
-    -filter_complex hstack                                           \
-        -c:a copy          -c:v h264_nvenc          -crf 20          \
-        -tune hq -b:v 5M   -bufsize 5M              -maxrate 10M     \
-        -qmin 0 -bf 3      -b_ref_mode middle       -temporal-aq 1   \
-    -rc-lookahead 20       "$outputDir/$vod" };
+    #my $cmd = qq{docker run --rm -it                                \\
+    #--name $channel_name-pogvodbot                                  \\
+    #-e running_application='ffmpeg'                                 \\
+    #--network 'shitting_and_farting' -v nas_share:/nas/             \\
+    # xychelsea/ffmpeg-nvidia:latest                                 \\
+    my $cmd = q{ffmpeg};
+    my $trigger_command = qq{ -i $outputDir/'$video'                  \\
+    -i $outputDir/'$chat'                                             \\
+    -filter_complex hstack -preset veryfast -vsync 2
+    $gcsMountPoint/$channel_name/'$vod' };
     &PeePoo::printl(q{debug}, qq{\n\n(pogvodbot command):\n$cmd\n\n});
-    return $cmd;
+    return $cmd . $trigger_command;
 }
 
 sub live_trigger() {
     my $channel_name = shift;
     return undef unless defined $channel_name;
     chomp $channel_name;
-    my $vod_id = shift;
 
-    my $outputDir = qq{/nas/videos/Captures/$channel_name};
+    my $outputDir = $localMntPoint . $localOutPath . $channel_name;
     print qx{mkdir -vp $outputDir} unless -d $outputDir;
+    my $timestamp = &PeePoo::timestamp(q{yyyy_mm_dd-hh:mm:ss});
 
-    my $fm_exec    = new Parallel::ForkManager(2);
-    my %live_record = (
-        stream  =>  {
-            container   =>  qq{$channel_name-peepoowatchbot},
-        },
-        chat    =>  {
-            container   =>  qq{$channel_name-peepoochatbot},
-        },
-        twitch_chat =>  {
-            container   =>  qq{$channel_name-peepootwitchybot},
-        },
-        vod     =>  {
-            container   =>  qq{$channel_name-pogvodbot},
-        }
-    );
+    my $live_record = &get_watchbot_cmd($channel_name, $outputDir);
+    &PeePoo::printl(q{warning}, qq{executing $live_record});
+    my ($liveRecord_executionStatus, $liveRecored_returnOutput, $liveRecord_returnCode) = &PeePoo::printxl($live_record);
 
-    # Launch stream and chat recording simultaneously
-    $live_record{stream}{command}= &get_watchbot_cmd($channel_name, $outputDir);
-    #$live_record{chat}{command}  = &get_chatbot_cmd($channel_name, $outputDir);
+    my $video = &get_fn($outputDir, q{.mp4});
+    $video =~ s/\.temp//; $video =~ s/\.part//;
+    system(qq{mv $outputDir/$video $outputDir/$timestamp.$video});
+    $video = qq{$timestamp.$video} if -f qq{$outputDir/$timestamp.$video};
+    (my $chat = $video) =~ s/\.(\w{3})$/_chat/;
+    (my $vod = $video)  =~ s/\.(\w{3})$/_fullvod.$1/;
 
-    $fm_exec->run_on_start(sub {
-        my ($pid, $ident) = @_;
-        &PeePoo::printl(q{info}, qq{$ident($pid) started\n});
-    });
-    $fm_exec->run_on_finish(sub {
-        my ($pid, $returnCode, $ident) = @_;
-        # Even if it's cut short, chat should end when stream does, re-concat in any other context is incrementally more work
-        # if ($ident eq q{stream}) {
-        #     &PeePoo::printl(q{warning}, qq{Stopping $live_record{chat}{container}\n...});
-        #     &PeePoo::printl(q{info}, qx{docker stop $live_record{chat}{container}}, qx{docker ps});
-        # }
-        my $video = &get_fn($outputDir, q{.mp4});
-        (my $chat = $video) =~ s/\.(\w{3})$/_chat/;
-        (my $vod = $video)  =~ s/\.(\w{3})$/_fullvod.$1/;
-        my $vod_id = &get_vod_id($channel_name);
-        my $chatDownloadCmd = &get_chatdownload_cmd($channel_name, $outputDir, qq{$chat.json}, $vod_id);
-        my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4});
-        my $vodCmd = &get_vod_cmd($channel_name, $outputDir, $chat, $video, $vod);
-        &PeePoo::printl(q{debug}, qq{* Downloading chat as JSON\n});
-        &PeePoo::printxl(qq{$chatDownloadCmd});
-        &PeePoo::printl(q{debug}, qq{* Encoding chat as JSON -> MP4\nRunning $twitchifyCmd\n});
-        &PeePoo::printxl($twitchifyCmd);
-        &PeePoo::printl(q{debug}, qq{* Rendering chat appended stream\n});
-        &PeePoo::printxl($vodCmd);
-        &PeePoo::printl(q{debug}, qq{* Transferring to Google Cloud\n});
-        &transfer($channel_name, $outputDir, $vod, $gcsMountPoint);
-        &PeePoo::printl(q{info}, qq{YAY we uploaded $vod});
-    });
+    my $vod_id = &get_vod_id($channel_name);
+    &PeePoo::printl(q{warning}, qq{Got VOD ID $vod_id\n});
 
-    #RECORDING:
-    # no longer doing stream and chat in parallel
-    # foreach my $r ('stream', 'chat') {
-    my $r = q{stream};
+    my $chatDownloadCmd = &get_chatdownload_cmd($channel_name, $outputDir, qq{$chat.json}, $vod_id);
+    &PeePoo::printl(q{warning}, qq{(chat Download) executing $chatDownloadCmd});
+    my ($chatDownload_executionStatus, $chatDownload_returnOutput, $chatDownload_returnCode) = &PeePoo::printxl($chatDownloadCmd);
 
-    $fm_exec->start($r) and next RECORDING;
+    my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4});
+    &PeePoo::printl(q{warning}, qq{(chat render) executing $twitchifyCmd});
+    my ($chatRender_executionStatus, $chatRender_returnOutput, $chatRender_returnCode) = &PeePoo::printxl($twitchifyCmd);
+    system(qq{rm $outputDir/$chat.json}) if $chatRender_executionStatus =~ m/success/i;
 
-    &PeePoo::printl(q{warning}, qq{executing $live_record{$r}{command}});
-    my ($executionStatus, $returnOutput, $returnCode) = &PeePoo::printxl($live_record{$r}{command});
-    print qq{$channel_name($r) exited with $returnCode - $executionStatus\n\n$returnOutput\n\n};
-    #}
-    
-
-    # my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, $chat);
-    # my $vodCmd = &get_vod_cmd($channel_name, $outputDir, $chat, $video, $vod);
-
-    # &poll($channel_name);
-
+    my $vodCmd = &get_vod_cmd($channel_name, $outputDir, qq{$chat.mp4}, $video, $vod);
+    &PeePoo::printl(q{warning}, qq{(Concat Chat & VOD) executing $vodCmd});
+    my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd); 
+    system(qq{rm $outputDir/$chat.mp4 $outputDir/$video*}) if $fullVOD_executionStatus =~ m/success/i;
 }
+
 ############################################################################
+
 sub start_headless_chromium() {
     &PeePoo::printxl(qq{docker run -d --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
     sleep 5;
@@ -332,11 +284,11 @@ sub get_vod_id() {
     use WWW::Mechanize::Chrome;
     Log::Log4perl->easy_init($ERROR);
     my $url = qq{https://twitch.tv/$channel_name/videos?filter=archives&sort=time};
-    my $js  = q{$document.getElementsByClassName("ScTransformWrapper-sc-1wvuch4-1 gMwbGx")[0].firstChild.href.match(/\d{10,}/)[0]};
+    my $js  = q{document.getElementsByClassName("ScTransformWrapper-sc-1wvuch4-1 gMwbGx")[0].firstChild.href.match(/\d{10,}/)[0]};
     
     Log::Log4perl->easy_init($ERROR);
     my $mech = WWW::Mechanize::Chrome->new(
-        launch_exe    => q{chromium-browser},
+        launch_exe    => q{chromium},
         headless      => 1,
         autodie       => 0,
         host          => q{localhost},
@@ -344,23 +296,21 @@ sub get_vod_id() {
         json_log_file => q{/downloads/getVOD.log}
     );
     $mech->allow( javascript => 1 );
-
     $mech->get($url);
     sleep 5;
 
     my ($vod_id, $type) = $mech->eval($js);
-
     if ($type eq "string") {
         return $vod_id;
     }
     else {
-        print "Got $type $vod_id\nTrying again\n";
+        print "\nGot $type $vod_id\nTrying again\n";
         &get_vod_id($channel_name);
     }
 }
 
-sub stop_headless_chromium() {
-    &PeePoo::printxl(qq{docker stop peepooemu});
+sub prune_headless_chromium() {
+    &PeePoo::printxl(qq{docker container rm peepooemu}) if qx{docker container ls} !~ m/peepooemu/;
 }
 
 
@@ -374,8 +324,9 @@ sub transfer() {
 
     my $is_mounted = &setup_transient_storage($channel_name);
     if ($is_mounted) {
-        &copy_to_gcs(qq{$localPath/$localPath_fn}, $transfer_dir);
-        &teardown_transient_storage();
+        system(qq{cp $localPath/$localPath_fn $transfer_dir});
+        #&copy_to_gcs(qq{$localPath/$localPath_fn}, $transfer_dir);
+        #&teardown_transient_storage();
     }
 }
 
@@ -383,10 +334,10 @@ sub get_fn() {
     my $path = shift;
     my $filter = shift;
     if ($filter) {
-        return qx{ls -tr | grep $filter | tail -1 | tr -d "\n"};
+        return qx{ls -tr $path | grep $filter | tail -1 | tr -d "\n"};
     }
     else {
-        return qx{ls -tr | tail -1| tr -d "\n"}
+        return qx{ls -tr $path | tail -1| tr -d "\n"}
     }
 }
 
@@ -398,7 +349,7 @@ sub setup_transient_storage() {
         #gcsfuse --key-file /tmp/revod-364904-c9d09a09225b.json --log-file /tmp/gcsfuse.log --debug_gcs --debug_fuse --debug_http --implicit-dirs transient-peepoo  /downloads
 
         &PeePoo::printxl(qq{gcsfuse --key-file $authorization --log-file $gcsLogFile --debug_gcs --debug_fuse --debug_http --implicit-dirs $gcsBucketName $gcsMountPoint});
-        my $is_mounted = qx{ls -l /$gcsMountPoint/ | wc -l | tr -d "\n"};
+        my $is_mounted = qx{ls -l $gcsMountPoint/ | wc -l | tr -d "\n"};
         if ($is_mounted) {
             &PeePoo::printl(q{info}, qq{Mounting completed.}); 
             return $is_mounted;
@@ -439,5 +390,6 @@ sub copy_to_gcs() {
 ##################################################################################
 
 $streams{pid}{$$}{channel} = q{Parent};
+&prune_headless_chromium();
 &start_headless_chromium();
 &main(@ARGV);
