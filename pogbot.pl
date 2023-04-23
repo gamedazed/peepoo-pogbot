@@ -1,4 +1,3 @@
-gamedazed@instance-2:~$ cat pogbot.pl
 #! /usr/bin/perl
 
 use strict;
@@ -56,22 +55,6 @@ $PeePoo::logLevel   =   q{debug};
 $PeePoo::logFile    =   qq{/$home/pog.log};
 ####################################### testing #######################################                                                 
 
-my %streams=(
-    channel =>  {
-        lordaethelstan  =>  {
-            userid      =>  q{1665175701}
-        },
-        nyanners        =>  {
-            userid      =>  q{82350088}
-        },
-        tobs            =>  {
-            userid      =>  q{598826002}
-        },
-        coqui           =>  {
-            userid      =>  q{633385488}
-        }
-    }
-);
 my %config;
 
 # main loop
