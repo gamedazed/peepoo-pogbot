@@ -262,7 +262,6 @@ sub get_vod_id() {
         autodie       => 0,
         host          => q{localhost},
         port          => 9222,
-        json_log_file => q{/downloads/getVOD.log}
     );
     $mech->allow( javascript => 1 );
     $mech->get($url);
