@@ -40,7 +40,6 @@ use WWW::Twitch;
 my @watch_list = qw{lordaethelstan};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
-#my $configFile = q{pogbot.ini};
 #################################### Compatability ####################################
 my $browser         =   q{firefox};
 my $localMntPoint   =   q{/nas};
@@ -53,9 +52,7 @@ my $authorization   =   qq{/$home/revod-364904-c9d09a09225b.json};
 $PeePoo::verbosity  =   q{debug};
 $PeePoo::logLevel   =   q{debug};
 $PeePoo::logFile    =   qq{/$home/pog.log};
-####################################### testing #######################################                                                 
-
-my %config;
+####################################### testing #######################################
 
 # main loop
 sub main() {
@@ -87,23 +84,14 @@ sub poll() {
         &PeePoo::printxl(q{echo && find /nas/videos/Captures/ -type f -mmin -1800 -exec ls -l {} \;}) if qx{ps aux | grep yt-dlp | grep -v grep | wc -l | tr -d "\n"};
         # Show actively running yt-dlp processes
         &PeePoo::printxl(q{echo && ps aux | grep yt-dlp | grep -v grep }) if qx{ps aux | grep yt-dlp | grep -v grep | wc -l | tr -d "\n"};
-        &PeePoo::printxl(q{docker ps})
     },180);
     $fm_poll->run_on_start(sub {
         my ($pid, $ident) = @_;
         &PeePoo::printl( q{info}, qq{Started polling for $ident - ($pid)!\n} );
     });
     #####################################################################
-    my $channel = shift;
-    my @channels;
-    if (defined $channel) {
-        push @channels, $_ foreach (split(/,/, $channel));
-    }
-    else {
-        @channels = @watch_list;
-    }
     POLL:
-    foreach my $channel_name (@channels) {
+    foreach my $channel_name (@watch_list) {
         my $pid = $fm_poll->start($channel_name) and next POLL;
         $streams{channel}{$channel_name}{pid} = $pid;
         $streams{pid}{$pid}{channel} = $channel_name;
