@@ -102,10 +102,7 @@ sub stage_env() {
     return $path;
 }
 
-# does the coloring for printl / printxl
-sub color_code() {
-    my $colorCode = shift;
-    my $message   = shift;
+sub get_palette() {
     my %color_palette = (
         debug   =>  [ DARK BLUE ON_BLACK ],
         info    =>  [ BOLD BLUE ON_BLACK ],
@@ -118,12 +115,44 @@ sub color_code() {
         notice  =>  [ DARK GREEN ON_BLACK ],
         ambient =>  [ FAINT WHITE ON_BLACK ],
     );
+    return \%color_palette
+}
 
-    &printl(q{warning}, qq{The log identifier $colorCode is not valid\n!})
-      and return qq{@{$color_palette{default}}} . $message . qq{@{$color_palette{reset}}}
-      unless defined $color_palette{$colorCode};
+# does the coloring for printl / printxl
+sub color_code() {
+    my $colorCode = shift;
+    my $message   = shift;
+    my $color_palette = &get_palette();
 
-    return qq{@{$color_palette{$colorCode}}} . $message . qq{@{$color_palette{reset}}};
+    # Input Validation
+    ## For some reason message isn't defined (what, then, are we logging)
+    if (!defined $message) {
+        # If, for instance, message found itself in $colorCode position because $colorCode was unable to be determined
+        if (defined $colorCode) {
+            my $message_in_color_field=1; # < start off with assumption message ended up in colorCode,
+            #  do away with that assumption only if colorCode is not one of the existing palette options
+            foreach my $color (keys %$color_palette) {
+                $message_in_color_field-- if $color eq $colorCode;
+            }
+            if ($message_in_color_field) {
+                # Set message accordingly
+                $message   = $colorCode;
+                # If no colorCode was able to be determined, go with default
+                $colorCode = q{default}
+            }
+        }
+        else {
+            # No arguments were given. No sense breaking on this, but no sense doing anything either
+            return;
+        }
+    }
+    elsif (!$message || $message =~ m/^\s*$/) {
+        &printl('debug', qq{color_code got:\n\tMessage: $message\n\tColorCode: $colorCode\n});
+        # Empty arguments were given. No sense breaking on this, but no sense doing anything either
+        return;
+    }
+
+    return qq{@{$$color_palette{$colorCode}}} . $message . qq{@{$$color_palette{reset}}};
 }
 
 # print and log an execution, get return code, sys/perl error string(s), and command output as return
@@ -372,15 +401,15 @@ sub rsync_xfer(){
     my $destination = shift;
     my $options = shift;
     my $command = q{rsync };
-    $command .= &option_heiphenate(qq{--$_ }) foreach (@{$$options{bool}});
-    $command .= &option_heiphenate(qq{--$_=$$options{paramd}{$_}} ) foreach (keys %{$$options{paramd}});
-    $command .= &option_heiphenate(q{vv }) if $PeePoo::verbosity eq q{debug};
-    $command .= &option_heiphenate(q{v }) if $PeePoo::verbosity eq q{info};
+    $command .= &option_heiphenate(qq{$_}) foreach (@{$$options{bool}});
+    $command .= &option_heiphenate(qq{$_}, qq{$$options{paramd}{$_}} ) foreach (keys %{$$options{paramd}});
+    $command .= &option_heiphenate(q{vv}) if $PeePoo::verbosity eq q{debug};
+    $command .= &option_heiphenate(q{v}) if $PeePoo::verbosity eq q{info};
     $command .= qq{$source $destination};
 
-    #&PeePoo::printl(q{debug}, qq{Running $command});
+    &printl(q{debug}, qq{Running $command});
     return $command
-    #my ($status, $output, $rc) = &PeePoo::printxl($command);
+    my ($status, $output, $rc) = &printxl($command);
 
     my %rc_lookup = (
         0    =>  q{success},
@@ -413,18 +442,18 @@ sub option_heiphenate() {
     my $paramValue = shift;
     if (length($paramName) == 1) {
         if (defined $paramValue) {
-            return qq{-$paramName $paramValue}
+            return qq{ -$paramName $paramValue }
         }
         else {
-            return qq{-$paramName}
+            return qq{ -$paramName }
         }
     }
     else {
         if (defined $paramValue) {
-            return qq{--$paramName=$paramValue};
+            return qq{ --$paramName=$paramValue };
         }
         else {
-            return qq{--$paramName};
+            return qq{ --$paramName };
         }
     }
     return &PeePoo::printl(q{warning}, qq{Didn't determine what kind of heiphenation was appropriate here ($paramName)});
