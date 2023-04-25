@@ -229,30 +229,48 @@ sub live_trigger() {
     my $live_record = &get_watchbot_cmd($channel_name, $outputDir);
     &PeePoo::printl(q{warning}, qq{executing $live_record});
     my ($liveRecord_executionStatus, $liveRecored_returnOutput, $liveRecord_returnCode) = &PeePoo::printxl($live_record);
+    &PeePoo::printl(q{notice}, qq{\n - The recording completed as a $liveRecord_executionStatus with exit code $liveRecord_returnCode.\n});
 
     my $video = &get_fn($outputDir, q{.mp4});
+    &PeePoo::printl(q{notice}, qq{    * Filename: $video});
     $video =~ s/\.temp//; $video =~ s/\.part//;
-    system(qq{mv $outputDir/$video $outputDir/$timestamp.$video});
+    &PeePoo::printl(q{notice}, qq{    * Santized Filename: $video});
+    &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'});
     $video = qq{$timestamp.$video} if -f qq{$outputDir/$timestamp.$video};
+    &PeePoo::printl(q{notice}, qq{    * Timestamped Filename: $video});
     (my $chat = $video) =~ s/\.(\w{3})$/_chat/;
     (my $vod = $video)  =~ s/\.(\w{3})$/_fullvod.$1/;
 
     my $vod_id = &get_vod_id($channel_name);
-    &PeePoo::printl(q{warning}, qq{Got VOD ID $vod_id\n});
+    if ($vod_id =~ m/\d+/) {
+        &PeePoo::printl(q{notice}, qq{ - Got VOD ID $vod_id\n});
+    }
+    else {
+        defined $vod_id ?
+          &PeePoo::printl(q{critical}, qq{ VOD ID returned $vod_id - I'm going to try to download chat with this but I don't think it looks right\n}) :
+          &PeePoo::printl(q{critical}, qq{ VOD ID returned undefined! Cannot download chat!\n});
+          die unless defined $vod_id;
+    }
+    
 
     my $chatDownloadCmd = &get_chatdownload_cmd($channel_name, $outputDir, qq{$chat.json}, $vod_id);
-    &PeePoo::printl(q{warning}, qq{(chat Download) executing $chatDownloadCmd});
+    &PeePoo::printl(q{notice}, qq{\n(chat Download) executing $chatDownloadCmd\n});
     my ($chatDownload_executionStatus, $chatDownload_returnOutput, $chatDownload_returnCode) = &PeePoo::printxl($chatDownloadCmd);
+    &PeePoo::printl(q{notice}, qq{ - Chat has finished downloading\n});
 
     my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4});
-    &PeePoo::printl(q{warning}, qq{(chat render) executing $twitchifyCmd});
+    &PeePoo::printl(q{notice}, qq{\n(chat render) executing $twitchifyCmd\n});
     my ($chatRender_executionStatus, $chatRender_returnOutput, $chatRender_returnCode) = &PeePoo::printxl($twitchifyCmd);
-    system(qq{rm $outputDir/$chat.json}) if $chatRender_executionStatus =~ m/success/i;
+    &PeePoo::printl(q{notice}, qq{ - Chat has finished rendering\n});
+    &PeePoo::printxl(qq{rm -v $outputDir/$chat.json}) if $chatRender_executionStatus =~ m/success/i;
 
     my $vodCmd = &get_vod_cmd($channel_name, $outputDir, qq{$chat.mp4}, $video, $vod);
-    &PeePoo::printl(q{warning}, qq{(Concat Chat & VOD) executing $vodCmd});
+    &PeePoo::printl(q{notice}, qq{\n(Concat Chat & VOD) executing $vodCmd\n});
     my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd); 
-    system(qq{rm $outputDir/$chat.mp4 $outputDir/$video*}) if $fullVOD_executionStatus =~ m/success/i;
+    &PeePoo::printl(q{notice}, qq{ - Video & Chat Concat Completed - FullVOD finalized\n});
+    system(qq{rm -v $outputDir/$chat.mp4 $outputDir/$video*}) if $fullVOD_executionStatus =~ m/success/i;
+
+    &post_notification($channel_name, $vod);
 }
 
 ############################################################################
@@ -264,6 +282,8 @@ sub start_headless_chromium() {
 
 sub get_vod_id() {
     my $channel_name = shift;
+    my $try = shift;
+    $try = 0 if !defined $try;
     use Log::Log4perl qw(:easy);
     use WWW::Mechanize::Chrome;
     Log::Log4perl->easy_init($ERROR);
@@ -287,8 +307,16 @@ sub get_vod_id() {
         return $vod_id;
     }
     else {
-        print "\nGot $type $vod_id\nTrying again\n";
-        &get_vod_id($channel_name);
+        if ($try < 10) {
+            print "\nGot $type $vod_id\nTrying again ($try)\n";
+            $try++;
+            &get_vod_id($channel_name, $try);
+        }
+        else {
+            &prune_headless_chromium();
+            &start_headless_chromium();
+            &get_vod_id($channel_name);
+        }
     }
 }
 
