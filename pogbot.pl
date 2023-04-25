@@ -43,15 +43,15 @@ my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 #################################### Compatability ####################################
 my $browser         =   q{firefox};
 my $localMntPoint   =   q{/nas};
-my $home            =   q{home/gamedazed};
+my $home            =   q{/home/gamedazed};
 my $localOutPath    =   q{/videos/Captures/};
 my $gcsMountPoint   =   q{/downloads};
 my $gcsBucketName   =   q{transient-peepoo};
-my $gcsLogFile      =   qq{/$home/gcsfuse.log};
-my $authorization   =   qq{/$home/revod-364904-c9d09a09225b.json};
+my $gcsLogFile      =   qq{$home/gcsfuse.log};
+my $authorization   =   qq{$home/revod-364904-c9d09a09225b.json};
 $PeePoo::verbosity  =   q{debug};
 $PeePoo::logLevel   =   q{debug};
-$PeePoo::logFile    =   qq{/$home/pog.log};
+$PeePoo::logFile    =   qq{$home/pog.log};
 ####################################### testing #######################################
 my %streams=(
     channel =>  {
@@ -249,7 +249,7 @@ sub live_trigger() {
         defined $vod_id ?
           &PeePoo::printl(q{critical}, qq{ VOD ID returned $vod_id - I'm going to try to download chat with this but I don't think it looks right\n}) :
           &PeePoo::printl(q{critical}, qq{ VOD ID returned undefined! Cannot download chat!\n});
-          die unless defined $vod_id;
+        die unless defined $vod_id;
     }
     
 
@@ -276,7 +276,7 @@ sub live_trigger() {
 ############################################################################
 
 sub start_headless_chromium() {
-    &PeePoo::printxl(qq{docker run -d --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
+    &PeePoo::printxl(qq{$home/bin/docker run -d --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
     sleep 5;
 }
 
@@ -321,7 +321,7 @@ sub get_vod_id() {
 }
 
 sub prune_headless_chromium() {
-    &PeePoo::printxl(qq{docker container rm peepooemu}) if qx{docker container ls} !~ m/peepooemu/;
+    &PeePoo::printxl(qq{$home/bin/docker container rm peepooemu}) if qx{$home/bin/docker container ls} !~ m/peepooemu/;
 }
 
 
