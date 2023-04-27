@@ -56,7 +56,8 @@ $PeePoo::logFile    =   qq{$home/pog.log};
 my %streams=(
     channel =>  {
         lordaethelstan  =>  {
-            userid      =>  q{1665175701}
+ #           userid      =>  q{1665175701},
+            discord     =>  qx{cat $home/.webhook | tr -d "\n"},
         },
         nyanners        =>  {
             userid      =>  q{82350088}
@@ -72,8 +73,7 @@ my %streams=(
 # main loop
 sub main() {
     while (1) { 
-        my ($vod_id, $channel_name) = &poll();
-        &live_trigger($channel_name) if ($vod_id && $channel_name);
+        &poll();
     }
 }
 
@@ -123,9 +123,7 @@ sub get_live_status {
     until($is_live->{id}) {
         $is_live = $twitch->live_stream($channel_name);
     }
-    &PeePoo::printl(q{info}, qq{$is_live->{id}});
-    my $vod_id = $is_live->{id};
-    my $post_processing_cmd = &live_trigger($channel_name, $vod_id);
+    my $post_processing_cmd = &live_trigger($channel_name);
     return $post_processing_cmd;
 }
 
@@ -211,7 +209,7 @@ sub get_vod_cmd() {
     my $cmd = q{ffmpeg};
     my $trigger_command = qq{ -i $outputDir/'$video'                  \\
     -i $outputDir/'$chat'                                             \\
-    -filter_complex hstack -preset veryfast -vsync 2
+    -filter_complex hstack -preset veryfast -vsync 2                  \\
     $gcsMountPoint/$channel_name/'$vod' };
     &PeePoo::printl(q{debug}, qq{\n\n(pogvodbot command):\n$cmd\n\n});
     return $cmd . $trigger_command;
@@ -252,7 +250,6 @@ sub live_trigger() {
         die unless defined $vod_id;
     }
     
-
     my $chatDownloadCmd = &get_chatdownload_cmd($channel_name, $outputDir, qq{$chat.json}, $vod_id);
     &PeePoo::printl(q{notice}, qq{\n(chat Download) executing $chatDownloadCmd\n});
     my ($chatDownload_executionStatus, $chatDownload_returnOutput, $chatDownload_returnCode) = &PeePoo::printxl($chatDownloadCmd);
@@ -262,13 +259,13 @@ sub live_trigger() {
     &PeePoo::printl(q{notice}, qq{\n(chat render) executing $twitchifyCmd\n});
     my ($chatRender_executionStatus, $chatRender_returnOutput, $chatRender_returnCode) = &PeePoo::printxl($twitchifyCmd);
     &PeePoo::printl(q{notice}, qq{ - Chat has finished rendering\n});
-    &PeePoo::printxl(qq{rm -v $outputDir/$chat.json}) if $chatRender_executionStatus =~ m/success/i;
+    &PeePoo::printxl(qq{rm -v $outputDir/'$chat.json'}) if $chatRender_executionStatus =~ m/success/i;
 
     my $vodCmd = &get_vod_cmd($channel_name, $outputDir, qq{$chat.mp4}, $video, $vod);
     &PeePoo::printl(q{notice}, qq{\n(Concat Chat & VOD) executing $vodCmd\n});
     my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd); 
     &PeePoo::printl(q{notice}, qq{ - Video & Chat Concat Completed - FullVOD finalized\n});
-    system(qq{rm -v $outputDir/$chat.mp4 $outputDir/$video*}) if $fullVOD_executionStatus =~ m/success/i;
+    #system(qq{rm -v $outputDir/'$chat.mp4' $outputDir/'$video'*}) if $fullVOD_executionStatus =~ m/success/i;
 
     &post_notification($channel_name, $vod);
 }
@@ -276,7 +273,11 @@ sub live_trigger() {
 ############################################################################
 
 sub start_headless_chromium() {
-    &PeePoo::printxl(qq{$home/bin/docker run -d --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
+    my $docker;
+    -f qq{$home/bin/docker}        ?
+      $docker = qq{$home/bin/docker} :
+      $docker = q{docker}           ;
+    &PeePoo::printxl(qq{$docker run -d --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
     sleep 5;
 }
 
@@ -321,7 +322,11 @@ sub get_vod_id() {
 }
 
 sub prune_headless_chromium() {
-    &PeePoo::printxl(qq{$home/bin/docker container rm peepooemu}) if qx{$home/bin/docker container ls} !~ m/peepooemu/;
+    my $docker;
+    -f qq{$home/bin/docker}        ?
+      $docker = qq{$home/bin/docker} :
+      $docker = q{docker}           ;
+    &PeePoo::printxl(qq{$docker container rm peepooemu}) if qx{$docker container ls} !~ m/peepooemu/;
 }
 
 
@@ -356,8 +361,6 @@ sub setup_transient_storage() {
     my $channel_name = shift;
     if (!-d qq{$gcsMountPoint/$channel_name}) {
         &PeePoo::printl(q{info}, "Mounting GCS Fuse.");
-
-        #gcsfuse --key-file /tmp/revod-364904-c9d09a09225b.json --log-file /tmp/gcsfuse.log --debug_gcs --debug_fuse --debug_http --implicit-dirs transient-peepoo  /downloads
 
         &PeePoo::printxl(qq{gcsfuse --key-file $authorization --log-file $gcsLogFile --debug_gcs --debug_fuse --debug_http --implicit-dirs $gcsBucketName $gcsMountPoint});
         my $is_mounted = qx{ls -l $gcsMountPoint/ | wc -l | tr -d "\n"};
@@ -405,17 +408,15 @@ sub post_notification() {
     my $channel_name = shift;
     my $video = shift;
 
-    my $dev_discord_url = qx{cat $home/.webhook | tr -d "\n"};
+    my $dev_discord_url = $streams{channel}{$channel_name}{discord};
+    return unless $dev_discord_url;
     my $storage_bucket_pubDir = qq{https://storage.googleapis.com/transient-peepoo/$channel_name};
-
     my $uriTitle = &PeePoo::uri_encode($video);
     my $link = qq{$storage_bucket_pubDir/$uriTitle};
-
     my $notification = qq{$video\n$link};
 
     my $hook = WebService::Discord::Webhook->new( $dev_discord_url );
     $hook->get();
-
     $hook->execute( content => $notification );
 }
 
