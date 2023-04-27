@@ -266,8 +266,11 @@ sub live_trigger() {
     my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd); 
     &PeePoo::printl(q{notice}, qq{ - Video & Chat Concat Completed - FullVOD finalized\n});
     #system(qq{rm -v $outputDir/'$chat.mp4' $outputDir/'$video'*}) if $fullVOD_executionStatus =~ m/success/i;
+    # Let's hold off on deleting these until we get a few wins behind our belt
 
-    &post_notification($channel_name, $vod);
+    if (-f qq{/downloads/$vod}) {
+        &post_notification($channel_name, $vod);
+    }
 }
 
 ############################################################################
@@ -411,8 +414,11 @@ sub post_notification() {
     my $dev_discord_url = $streams{channel}{$channel_name}{discord};
     return unless $dev_discord_url;
     my $storage_bucket_pubDir = qq{https://storage.googleapis.com/transient-peepoo/$channel_name};
+
     my $uriTitle = &PeePoo::uri_encode($video);
+    my $clean = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s\|.*$/i;
     my $link = qq{$storage_bucket_pubDir/$uriTitle};
+    my $video  =~ s/$clean/$1/;
     my $notification = qq{$video\n$link};
 
     my $hook = WebService::Discord::Webhook->new( $dev_discord_url );
