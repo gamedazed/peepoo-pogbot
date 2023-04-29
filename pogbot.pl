@@ -132,7 +132,7 @@ sub get_watchbot_cmd() {
     my $outputDir = shift;
 
     my $ua  = q{Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0};
-    my $jar = qq{/$home/cookies.sqlite};
+    my $jar = qq{$home/cookies.sqlite};
     my $o   = qq{ -o "$outputDir/%(uploader)s-%(description)s.%(ext)s"};
 
     # my $cmd = qq{docker run --rm --name=${channel_name}-peepoowatchbot } .
