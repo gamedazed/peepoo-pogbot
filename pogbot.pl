@@ -56,7 +56,7 @@ $PeePoo::logFile    =   qq{$home/pog.log};
 my %streams=(
     channel =>  {
         lordaethelstan  =>  {
- #           userid      =>  q{1665175701},
+            userid      =>  q{1665175701},
             discord     =>  qx{cat $home/.webhook | tr -d "\n"},
         },
         nyanners        =>  {
@@ -416,7 +416,7 @@ sub post_notification() {
     my $storage_bucket_pubDir = qq{https://storage.googleapis.com/transient-peepoo/$channel_name};
 
     my $uriTitle = &PeePoo::uri_encode($video);
-    my $clean = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s\|.*$/i;
+    my $clean    = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s[｜\|].*$/i;
     my $link = qq{$storage_bucket_pubDir/$uriTitle};
     my $video  =~ s/$clean/$1/;
     my $notification = qq{$video\n$link};
@@ -424,6 +424,12 @@ sub post_notification() {
     my $hook = WebService::Discord::Webhook->new( $dev_discord_url );
     $hook->get();
     $hook->execute( content => $notification );
+}
+
+##################################################################################
+# Expect an array of fullvod paths
+sub merge_streams() {
+    
 }
 
 $streams{pid}{$$}{channel} = q{Parent};

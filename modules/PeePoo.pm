@@ -461,29 +461,16 @@ sub option_heiphenate() {
 
 sub uri_encode() {
     my $string = shift;
-    $string =~ s/(\%.{2})/%25/g unless defined $1 && $1 eq '%25';
-    $string =~ s/ /%20/g;
-#    $string =~ s/\!/%21/g;
-    $string =~ s/\"/%22/g;
-    $string =~ s/\#/%23/g;
-    $string =~ s/\$/%24/g;
-    $string =~ s/\&/%26/g;
-    $string =~ s/\'/%27/g;
-    $string =~ s/\(/%28/g;
-    $string =~ s/\)/%29/g;
-    $string =~ s/\*/%2A/g;
-    $string =~ s/\+/%2B/g;
-    $string =~ s/\,/%2C/g;
-    $string =~ s!/!%2F!g;
-    $string =~ s/\:/%3A/g;
-    $string =~ s/\;/%3B/g;
-    $string =~ s/\=/%3D/g;
-    $string =~ s/\?/%3F/g;
-    $string =~ s/\@/%40/g;
-    $string =~ s/\[/%5B/g;
-    $string =~ s/\]/%5D/g;
-    $string =~ s/\|/%EF%BD%9C/g;
-    return $string;
+    use URL::Encode;
+    return &fuckit(&URL::Encode::url_encode($string));
+}
+
+# so fucking stupid I have to do this
+sub fuckit() {
+    my $f = shift;
+    $f =~ s/\+/%20/g;
+    $f =~ s/%21/!/g;
+    return $f;
 }
 
 $| = 1;
