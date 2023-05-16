@@ -239,6 +239,7 @@ sub live_trigger() {
     (my $chat = $video) =~ s/\.(\w{3})$/_chat/;
     (my $vod = $video)  =~ s/\.(\w{3})$/_fullvod.$1/;
 
+    &PeePoo::printl(q{notice}, q{    * Getting VOD ID});
     my $vod_id = &get_vod_id($channel_name);
     if ($vod_id =~ m/\d+/) {
         &PeePoo::printl(q{notice}, qq{ - Got VOD ID $vod_id\n});
