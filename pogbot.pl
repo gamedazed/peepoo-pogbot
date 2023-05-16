@@ -187,7 +187,7 @@ sub get_chatrender_cmd() {
     my $cmd = q{TwitchDownloaderCLI };
     my $trigger_command = qq{chatrender }
     . qq{-i "$outputDir/$chatIn" }
-    . qq{--outline }
+    . qq{--outline --font-size 17 --skip-drive-waiting }
     . qq{-h 1080 -w 422  }
         . qq{--output "$outputDir/$chatOut"};
     &PeePoo::printl(q{debug}, qq{\n\n(twitchify command):\n$cmd\n\n});
@@ -307,6 +307,7 @@ sub get_vod_id() {
     sleep 5;
 
     my ($vod_id, $type) = $mech->eval($js);
+    print "Got Vod ID $vod_id and Type $type\n";
     if ($type eq "string") {
         return $vod_id;
     }
@@ -418,7 +419,7 @@ sub post_notification() {
     my $uriTitle = &PeePoo::uri_encode($video);
     my $clean    = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s[｜\|].*$/i;
     my $link = qq{$storage_bucket_pubDir/$uriTitle};
-    my $video  =~ s/$clean/$1/;
+    $video  =~ s/$clean/$1/;
     my $notification = qq{$video\n$link};
 
     my $hook = WebService::Discord::Webhook->new( $dev_discord_url );
@@ -427,10 +428,6 @@ sub post_notification() {
 }
 
 ##################################################################################
-# Expect an array of fullvod paths
-sub merge_streams() {
-    
-}
 
 $streams{pid}{$$}{channel} = q{Parent};
 &prune_headless_chromium();
