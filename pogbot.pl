@@ -37,7 +37,7 @@ use PeePoo;
 use Parallel::ForkManager;
 use WWW::Twitch;
 
-my @watch_list = qw{lordaethelstan aethelworld nyanners};
+my @watch_list = qw{lordaethelstan aethelworld nyanners gamedazed};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
 #################################### Compatability ####################################
@@ -60,7 +60,10 @@ my %streams=(
             discord     =>  qx{cat $home/.webhook | tr -d "\n"},
         },
         aethelworld     =>  {
-            discord     =>  qx{cat $home/.webhook | tr -d "\n"}
+            discord     =>  qx{cat $home/.webhook | tr -d "\n"},
+        }
+        gamedazed       =>  {
+            discord     =>  qx{cat $home/personal_server.webhook | tr -d "\n"},
         }
         nyanners        =>  {
             userid      =>  q{82350088}
@@ -142,17 +145,17 @@ sub get_watchbot_cmd() {
     #   q{-e running_application='yt-dlp' --network 'shitting_and_farting' } .
     #   q{jauderho/yt-dlp:latest};
     my $cmd = q{yt-dlp};
-    my $trigger_command = q{                 \
-    --sub-langs live_chat                    \
-    --hls-prefer-native                      \
-    --allow-dynamic-mpd                      \
-    --hls-split-discontinuity                \
-    --concurrent-fragments 5                 \
-    --write-subs   -vvv                      \
-    --user-agent '} . $ua  . q{'             \
-    --cookies }    . $jar . q{               \
-    https://twitch.tv/} . $channel_name . q{ \
-    --wait-for-video 1 } . $o               ;
+    my $trigger_command = qq{                \\
+    --sub-langs live_chat                    \\
+    --hls-prefer-native                      \\
+    --allow-dynamic-mpd                      \\
+    --hls-split-discontinuity                \\
+    --concurrent-fragments 5                 \\
+    --write-subs   -vvv                      \\
+    --user-agent '$ua'                       \\
+    --cookies $jar                           \\
+    https://twitch.tv/$channel_name          \\
+    --wait-for-video 1 $o    };
 
     &PeePoo::printl(q{debug}, qq{\n\n(watchbot command):\n$cmd $trigger_command\n\n});
     return qq{$cmd $trigger_command}
@@ -269,7 +272,7 @@ sub live_trigger() {
 
     my $vodCmd = &get_vod_cmd($channel_name, $outputDir, qq{$chat.mp4}, $video, $vod);
     &PeePoo::printl(q{notice}, qq{\n(Concat Chat & VOD) executing $vodCmd\n});
-    my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd); 
+    my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd);
     &PeePoo::printl(q{notice}, qq{ - Video & Chat Concat Completed - FullVOD finalized\n});
     #system(qq{rm -v $outputDir/'$chat.mp4' $outputDir/'$video'*}) if $fullVOD_executionStatus =~ m/success/i;
     # Let's hold off on deleting these until we get a few wins behind our belt
@@ -404,12 +407,12 @@ sub copy_to_gcs() {
             paramd  =>  {
                 q{min-size}         =>  q{100m},
                 q{itemize-changes}  =>  q{%<*c %fSD},
-                q{compress-level}   =>  9
+                q{compress-level}   =>  9,
             }
         );
         $options = \%o;
     }
-    return &PeePoo::rsync_xfer($source, $destination, $options)
+    return &PeePoo::rsync_xfer($source, $destination, $options);
 }
 ##################################################################################
 
@@ -417,9 +420,19 @@ sub post_notification() {
     use WebService::Discord::Webhook;
     my $channel_name = shift;
     my $video = shift;
+    my @urls;
 
     my $dev_discord_url = $streams{channel}{$channel_name}{discord};
-    return unless $dev_discord_url;
+    my $personal_discord_url = $streams{channel}{gamedazed}{discord};
+    foreach my $notification ($dev_discord_url, $personal_discord_url) {
+        # testing for definition and non-null before attempting to operate on it
+        if (defined $notification) {
+            if ($notification) {
+                push @urls, $notification;
+            }
+        }
+    }
+
     my $storage_bucket_pubDir = qq{https://storage.googleapis.com/transient-peepoo/$channel_name};
 
     my $uriTitle = &PeePoo::uri_encode($video);
@@ -428,9 +441,11 @@ sub post_notification() {
     $video  =~ s/$clean/$1/;
     my $notification = qq{$video\n$link};
 
-    my $hook = WebService::Discord::Webhook->new( $dev_discord_url );
-    $hook->get();
-    $hook->execute( content => $notification );
+    foreach my $url (@urls) {
+        my $hook = WebService::Discord::Webhook->new( $url );
+        $hook->get();
+        $hook->execute( content => $notification );
+    }
 }
 
 ##################################################################################
