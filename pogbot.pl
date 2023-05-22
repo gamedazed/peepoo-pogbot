@@ -37,7 +37,7 @@ use PeePoo;
 use Parallel::ForkManager;
 use WWW::Twitch;
 
-my @watch_list = qw{lordaethelstan};
+my @watch_list = qw{lordaethelstan aethelworld};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
 #################################### Compatability ####################################
@@ -278,10 +278,10 @@ sub live_trigger() {
 
 sub start_headless_chromium() {
     my $docker;
-    -f qq{$home/bin/docker}        ?
+    -f qq{$home/bin/docker}          ?
       $docker = qq{$home/bin/docker} :
-      $docker = q{docker}           ;
-    &PeePoo::printxl(qq{$docker run -d --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
+      $docker = q{docker}            ;
+    &PeePoo::printxl(qq{$docker run -d --restart=unless-stopped  --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
     sleep 5;
 }
 
@@ -328,10 +328,10 @@ sub get_vod_id() {
 
 sub prune_headless_chromium() {
     my $docker;
-    -f qq{$home/bin/docker}        ?
+    -f qq{$home/bin/docker}          ?
       $docker = qq{$home/bin/docker} :
-      $docker = q{docker}           ;
-    &PeePoo::printxl(qq{$docker container rm peepooemu}) if qx{$docker container ls} !~ m/peepooemu/;
+      $docker = q{docker}            ;
+    &PeePoo::printxl(qq{$docker container rm -f peepooemu}) if qx{$docker container ls} !~ m/peepooemu/;
 }
 
 
