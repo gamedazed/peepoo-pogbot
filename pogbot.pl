@@ -286,7 +286,7 @@ sub live_trigger() {
     if (-f qq{/downloads/$channel_name/$vod}) {
         &post_notification($channel_name, $vod);
     }
-    &poll($channel_name);
+    &get_live_status($channel_name);
 }
 
 sub generate_ratio() {
