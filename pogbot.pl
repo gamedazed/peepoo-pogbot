@@ -61,10 +61,10 @@ my %streams=(
         },
         aethelworld     =>  {
             discord     =>  qx{cat $home/.webhook | tr -d "\n"},
-        }
+        },
         gamedazed       =>  {
             discord     =>  qx{cat $home/personal_server.webhook | tr -d "\n"},
-        }
+        },
         nyanners        =>  {
             userid      =>  q{82350088}
         },
@@ -78,7 +78,7 @@ my %streams=(
 );
 # main loop
 sub main() {
-    while (1) { 
+    while (1) {
         &poll();
     }
 }
@@ -100,7 +100,7 @@ sub poll() {
         &PeePoo::printl( q{$status}, qq{$streams{pid}{$$}{channel}\'s stream ended\n} );
     });
     $fm_poll->run_on_wait(sub {
-        my $pid = shift; 
+        my $pid = shift;
         # Print files modified over the past 1800 minutes
         &PeePoo::printxl(q{echo && find /nas/videos/Captures/ -type f -mmin -1800 -exec ls -l {} \;}) if qx{ps aux | grep yt-dlp | grep -v grep | wc -l | tr -d "\n"};
         # Show actively running yt-dlp processes
