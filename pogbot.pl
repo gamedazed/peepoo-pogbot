@@ -185,16 +185,19 @@ sub get_chatrender_cmd() {
     my $outputDir     = shift;
     my $chatIn        = shift;
     my $chatOut       = shift;
+    my $height        = shift;
+    my $width         = shift;
     # my $cmd = qq{docker run --rm -it }
     # . qq{--name "$channel_name-peepootwitchybot" }
     # . qq{-e running_application='twitch-downloader-cli' }
     # . qq{--network 'shitting_and_farting' -v nas_share:/nas/ }
     # . qq{ bxggs/twitch-downloader-cli:latest };
     my $cmd = q{TwitchDownloaderCLI };
+    
     my $trigger_command = qq{chatrender }
     . qq{-i "$outputDir/$chatIn" }
     . qq{--outline --font-size 17 --skip-drive-waiting }
-    . qq{-h 1080 -w 422  }
+    . qq{-h $height -w $width  }
         . qq{--output "$outputDir/$chatOut"};
     &PeePoo::printl(q{debug}, qq{\n\n(twitchify command):\n$cmd\n\n});
 
@@ -265,7 +268,8 @@ sub live_trigger() {
     my ($chatDownload_executionStatus, $chatDownload_returnOutput, $chatDownload_returnCode) = &PeePoo::printxl($chatDownloadCmd);
     &PeePoo::printl(q{notice}, qq{ - Chat has finished downloading\n});
 
-    my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4});
+    my ($height, $width) = &generate_ratio(qq{$outputDir/$video});
+    my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4}, $height, $width);
     &PeePoo::printl(q{notice}, qq{\n(chat render) executing $twitchifyCmd\n});
     my ($chatRender_executionStatus, $chatRender_returnOutput, $chatRender_returnCode) = &PeePoo::printxl($twitchifyCmd);
     &PeePoo::printl(q{notice}, qq{ - Chat has finished rendering\n});
@@ -280,6 +284,30 @@ sub live_trigger() {
 
     if (-f qq{/downloads/$vod}) {
         &post_notification($channel_name, $vod);
+    }
+}
+
+sub generate_ratio() {
+    use POSIX;
+    my $fn = shift;
+    my $stream = qx{ffprobe -i $fn 2>&1};
+    my %chat_ratio = (
+        1080 => 422,
+        720  => 281,
+    );
+    if ($stream =~ m/Video\:.*?\s\d{3,4}x(\d{3,4})/) { 
+        my $height = $1;
+        if (defined $chat_ratio{$height}) {
+            return ($height, $chat_ratio{$height});
+        }
+        else {
+            my $ratio = floor($height / 2.55);
+            return ($height, $ratio);
+        }
+    }
+    else {
+        #assume 1080
+        return (1080, 422);
     }
 }
 
