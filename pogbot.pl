@@ -85,7 +85,7 @@ sub main() {
 
 #check each streamer's online state and provide status on files being generated
 sub poll() {
-    my @watchList = @_;
+    my @watching = @_;
     ############################# Callbacks #############################
     $fm_poll->run_on_finish(sub {
         my ($pid, $returnCode, $ident) = @_;
@@ -113,7 +113,7 @@ sub poll() {
     });
     #####################################################################
     POLL:
-    foreach my $channel_name (@watchList) {
+    foreach my $channel_name (@watching) {
         my $pid = $fm_poll->start($channel_name) and next POLL;
         $streams{channel}{$channel_name}{pid} = $pid;
         $streams{pid}{$pid}{channel} = $channel_name;
