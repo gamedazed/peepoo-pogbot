@@ -231,7 +231,9 @@ sub live_trigger() {
 
     my $video = &get_fn($outputDir, q{.mp4});
     &PeePoo::printl(q{notice}, qq{    * Filename: $video});
-    $video =~ s/\.temp//; $video =~ s/\.part//;
+    $video =~ s/\.temp//;     # .temp is used when finalizing   (Could be latest file if still finalizing)
+    $video =~ s/\.part//;     # .part is used when downloading  (Could be latest file if stream crashed)
+    $video =~ s/[\p{Sc}!]//g; # Santizing unicode characters and exclamations from the video name for fewer unexpected errors and easier remediation
     &PeePoo::printl(q{notice}, qq{    * Santized Filename: $video});
     &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'});
     $video = qq{$timestamp.$video} if -f qq{$outputDir/$timestamp.$video};
