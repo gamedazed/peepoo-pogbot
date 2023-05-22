@@ -79,12 +79,13 @@ my %streams=(
 # main loop
 sub main() {
     while (1) {
-        &poll();
+        &poll(@watch_list);
     }
 }
 
 #check each streamer's online state and provide status on files being generated
 sub poll() {
+    my @watchList = @_;
     ############################# Callbacks #############################
     $fm_poll->run_on_finish(sub {
         my ($pid, $returnCode, $ident) = @_;
@@ -112,7 +113,7 @@ sub poll() {
     });
     #####################################################################
     POLL:
-    foreach my $channel_name (@watch_list) {
+    foreach my $channel_name (@watchList) {
         my $pid = $fm_poll->start($channel_name) and next POLL;
         $streams{channel}{$channel_name}{pid} = $pid;
         $streams{pid}{$pid}{channel} = $channel_name;
@@ -282,9 +283,10 @@ sub live_trigger() {
     #system(qq{rm -v $outputDir/'$chat.mp4' $outputDir/'$video'*}) if $fullVOD_executionStatus =~ m/success/i;
     # Let's hold off on deleting these until we get a few wins behind our belt
 
-    if (-f qq{/downloads/$vod}) {
+    if (-f qq{/downloads/$channel_name/$vod}) {
         &post_notification($channel_name, $vod);
     }
+    &poll($channel_name);
 }
 
 sub generate_ratio() {
