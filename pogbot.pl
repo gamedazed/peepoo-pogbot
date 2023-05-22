@@ -228,6 +228,7 @@ sub live_trigger() {
 
     my $outputDir = $localMntPoint . $localOutPath . $channel_name;
     print qx{mkdir -vp $outputDir} unless -d $outputDir;
+    print qx{mkdir -vp $gcsMountPoint/$channel_name} unless -d qq{$gcsMountPoint/$channel_name};
     my $timestamp = &PeePoo::timestamp(q{yyyy_mm_dd-hh:mm:ss});
 
     my $live_record = &get_watchbot_cmd($channel_name, $outputDir);
