@@ -199,7 +199,7 @@ sub get_chatrender_cmd() {
     . qq{-i "$outputDir/$chatIn" }
     . qq{--outline --font-size 17 --skip-drive-waiting }
     . qq{-h $height -w $width  }
-        . qq{--output "$outputDir/$chatOut"};
+    . qq{--output "$outputDir/$chatOut"};
     &PeePoo::printl(q{debug}, qq{\n\n(twitchify command):\n$cmd\n\n});
 
     return $cmd . $trigger_command;
@@ -308,8 +308,8 @@ sub generate_ratio() {
         }
     }
     else {
-        #assume 1080
-        return (1080, 422);
+        #assume 1080 but log what went wrong
+        print "DOH\n\n$stream\n\n" and return (1080, 422);
     }
 }
 
