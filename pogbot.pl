@@ -59,6 +59,9 @@ my %streams=(
             userid      =>  q{1665175701},
             discord     =>  qx{cat $home/.webhook | tr -d "\n"},
         },
+        aethelworld     =>  {
+            discord     =>  qx{cat $home/.webhook | tr -d "\n"}
+        }
         nyanners        =>  {
             userid      =>  q{82350088}
         },
