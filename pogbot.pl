@@ -241,6 +241,7 @@ sub live_trigger() {
     &PeePoo::printl(q{notice}, qq{\n - The recording completed as a $liveRecord_executionStatus with exit code $liveRecord_returnCode.\n});
 
     my $video = &get_fn($outputDir, q{.mp4});
+    $video =~ s/_chat\.mp4$/\.mp4/;
     &PeePoo::printl(q{notice}, qq{    * Filename: $video});
     $video =~ s/\.temp//;     # .temp is used when finalizing   (Could be latest file if still finalizing)
     $video =~ s/\.part//;     # .part is used when downloading  (Could be latest file if stream crashed)
