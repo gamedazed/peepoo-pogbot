@@ -37,7 +37,7 @@ use PeePoo;
 use Parallel::ForkManager;
 use WWW::Twitch;
 
-my @watch_list = qw{lordaethelstan aethelworld nyanners gamedazed};
+my @watch_list = qw{lordaethelstan aethelworld};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
 #################################### Compatability ####################################
@@ -45,8 +45,8 @@ my $browser         =   q{firefox};
 my $localMntPoint   =   q{/nas};
 my $home            =   q{/home/gamedazed};
 my $localOutPath    =   q{/videos/Captures/};
-my $gcsMountPoint   =   q{/downloads};
-my $gcsBucketName   =   q{transient-peepoo};
+my $gcsMountPoint   =   q{/gdrive};
+my $gcsBucketName   =   q{pub};
 my $gcsLogFile      =   qq{$home/gcsfuse.log};
 my $authorization   =   qq{$home/revod-364904-c9d09a09225b.json};
 $PeePoo::verbosity  =   q{debug};
@@ -98,10 +98,12 @@ sub poll() {
             $error .= qq{$streams{pid}{$$}{channel} process exited with code $returnCode};
         }
         return $returnCode if $streams{pid}{$$}{channel} eq q{Parent};
-        &PeePoo::printl( q{$status}, qq{$streams{pid}{$$}{channel}\'s stream ended\n} );
+        &PeePoo::printl( q{info}, qq{$streams{pid}{$$}{channel}\'s stream ended\n} );
     });
     $fm_poll->run_on_wait(sub {
-        my $pid = shift;
+        my $channel_name = $streams{pid}{$$}{channel};
+        &PeePoo::printl(q{info}, qq{$channel_name ($$)});
+        
         # Print files modified over the past 1800 minutes
         &PeePoo::printxl(q{echo && find /nas/videos/Captures/ -type f -mmin -1800 -exec ls -l {} \;}) if qx{ps aux | grep yt-dlp | grep -v grep | wc -l | tr -d "\n"};
         # Show actively running yt-dlp processes
@@ -230,24 +232,25 @@ sub live_trigger() {
     return undef unless defined $channel_name;
     chomp $channel_name;
 
-    my $outputDir = $localMntPoint . $localOutPath . $channel_name;
-    print qx{mkdir -vp $outputDir} unless -d $outputDir;
-    print qx{mkdir -vp $gcsMountPoint/$channel_name} unless -d qq{$gcsMountPoint/$channel_name};
-    my $timestamp = &PeePoo::timestamp(q{yyyy_mm_dd-hh:mm:ss});
+    my $outputDir = $localMntPoint . $localOutPath . $channel_name; # i.e. /nas/videos/Captures/lordaethelstan
+    print qx{mkdir -vp $outputDir} unless -d $outputDir;            # create the subdirectory for the channel if it doesn't exist
+    print qx{mkdir -vp $gcsMountPoint/$channel_name} unless -d qq{$gcsMountPoint/$channel_name}; # i.e. /downloads/lordaethelstan
+    my $timestamp = &PeePoo::timestamp(q{yyyy_mm_dd-hh:mm:ss});     # i.e. 2023_05_30-16:22:30
 
     my $live_record = &get_watchbot_cmd($channel_name, $outputDir);
-    &PeePoo::printl(q{warning}, qq{executing $live_record});
+    &PeePoo::printl(q{notice}, qq{executing $live_record});
     my ($liveRecord_executionStatus, $liveRecored_returnOutput, $liveRecord_returnCode) = &PeePoo::printxl($live_record);
     &PeePoo::printl(q{notice}, qq{\n - The recording completed as a $liveRecord_executionStatus with exit code $liveRecord_returnCode.\n});
+    &wait_for_finalization($channel_name); # While yt-dlp is writing for the channel in question, wait 10 seconds and check again;
 
     my $video = &get_fn($outputDir, q{.mp4});
-    $video =~ s/_chat\.mp4$/\.mp4/;
+    $video =~ s/_chat\.mp4$/\.mp4/; # if a chat file was the most recently written
     &PeePoo::printl(q{notice}, qq{    * Filename: $video});
     $video =~ s/\.temp//;     # .temp is used when finalizing   (Could be latest file if still finalizing)
     $video =~ s/\.part//;     # .part is used when downloading  (Could be latest file if stream crashed)
     $video =~ s/[\p{Sc}!]//g; # Santizing unicode characters and exclamations from the video name for fewer unexpected errors and easier remediation
     &PeePoo::printl(q{notice}, qq{    * Santized Filename: $video});
-    &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'});
+    &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'}) unless $video =~ m/^\Q$timestamp\E/;
     $video = qq{$timestamp.$video} if -f qq{$outputDir/$timestamp.$video};
     &PeePoo::printl(q{notice}, qq{    * Timestamped Filename: $video});
     (my $chat = $video) =~ s/\.(\w{3})$/_chat/;
@@ -262,7 +265,10 @@ sub live_trigger() {
         defined $vod_id ?
           &PeePoo::printl(q{critical}, qq{ VOD ID returned $vod_id - I'm going to try to download chat with this but I don't think it looks right\n}) :
           &PeePoo::printl(q{critical}, qq{ VOD ID returned undefined! Cannot download chat!\n});
-        die unless defined $vod_id;
+        # If you don't have a VOD ID, as can happen when vods aren't saved on a channel, just move the vod recording to the cloud storage
+        &PeePoo::printxl(qq{mv -v $video $gcsMountPoint/$channel_name/$video});
+        &post_notification($channel_name, $video);
+        return 1;
     }
     
     my $chatDownloadCmd = &get_chatdownload_cmd($channel_name, $outputDir, qq{$chat.json}, $vod_id);
@@ -281,13 +287,13 @@ sub live_trigger() {
     &PeePoo::printl(q{notice}, qq{\n(Concat Chat & VOD) executing $vodCmd\n});
     my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd);
     &PeePoo::printl(q{notice}, qq{ - Video & Chat Concat Completed - FullVOD finalized\n});
-    #system(qq{rm -v $outputDir/'$chat.mp4' $outputDir/'$video'*}) if $fullVOD_executionStatus =~ m/success/i;
+    system(qq{rm -v $outputDir/'$chat.mp4' $outputDir/'$video'*}) if $fullVOD_executionStatus =~ m/success/i;
     # Let's hold off on deleting these until we get a few wins behind our belt
 
     if (-f qq{/downloads/$channel_name/$vod}) {
         &post_notification($channel_name, $vod);
     }
-    &get_live_status($channel_name);
+    return 1;
 }
 
 sub generate_ratio() {
@@ -374,6 +380,15 @@ sub prune_headless_chromium() {
     &PeePoo::printxl(qq{$docker container rm -f peepooemu}) if qx{$docker container ls} !~ m/peepooemu/;
 }
 
+sub wait_for_finalization() {
+    my $channel_name = shift;
+    my $cmd = qq{ps aux | grep yt-dlp | grep $channel_name | grep -v grep | tr -d "\n"};
+    while (qx{$cmd}) {
+        &PeePoo::printl(q{notice}, "finalizing VOD recording...\n");
+        sleep 10;
+    }
+    return 1;
+}
 
 ################ Google Cloud Storage - Mount, Transfer, Unmount ################
 
@@ -465,7 +480,8 @@ sub post_notification() {
         }
     }
 
-    my $storage_bucket_pubDir = qq{https://storage.googleapis.com/transient-peepoo/$channel_name};
+    # gcp
+    #my $storage_bucket_pubDir = qq{https://storage.googleapis.com/$gcsBucketName/$channel_name};
 
     my $uriTitle = &PeePoo::uri_encode($video);
     my $clean    = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s[｜\|].*$/i;
