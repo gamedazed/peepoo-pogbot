@@ -101,7 +101,7 @@ sub poll() {
         &PeePoo::printl( q{info}, qq{$streams{pid}{$$}{channel}\'s stream ended\n} );
     });
     $fm_poll->run_on_wait(sub {
-        foreach my $pid (keys %{$stream{pid}}) {
+        foreach my $pid (keys %{$streams{pid}}) {
             my $channel_name = $streams{pid}{$pid}{channel};
             next if $channel_name eq 'parent';
             &PeePoo::printl(q{info}, qq{$channel_name ($pid)});
