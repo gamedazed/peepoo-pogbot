@@ -101,9 +101,11 @@ sub poll() {
         &PeePoo::printl( q{info}, qq{$streams{pid}{$$}{channel}\'s stream ended\n} );
     });
     $fm_poll->run_on_wait(sub {
-        my $channel_name = $streams{pid}{$$}{channel};
-        &PeePoo::printl(q{info}, qq{$channel_name ($$)});
-        
+        foreach my $pid (keys %{$stream{pid}}) {
+            my $channel_name = $streams{pid}{$pid}{channel};
+            next if $channel_name eq 'parent';
+            &PeePoo::printl(q{info}, qq{$channel_name ($pid)});
+        }        
         # Print files modified over the past 1800 minutes
         &PeePoo::printxl(q{echo && find /nas/videos/Captures/ -type f -mmin -1800 -exec ls -l {} \;}) if qx{ps aux | grep yt-dlp | grep -v grep | wc -l | tr -d "\n"};
         # Show actively running yt-dlp processes
