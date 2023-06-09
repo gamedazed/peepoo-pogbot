@@ -267,7 +267,7 @@ sub live_trigger() {
           &PeePoo::printl(q{critical}, qq{ VOD ID returned undefined! Cannot download chat!\n});
         # If you don't have a VOD ID, as can happen when vods aren't saved on a channel, just move the vod recording to the cloud storage
         &PeePoo::printxl(qq{mv -v $video $gcsMountPoint/$channel_name/$video});
-        &post_notification($channel_name, $video);
+        #&post_notification($channel_name, $video);
         return 1;
     }
     
@@ -291,7 +291,7 @@ sub live_trigger() {
     # Let's hold off on deleting these until we get a few wins behind our belt
 
     if (-f qq{/downloads/$channel_name/$vod}) {
-        &post_notification($channel_name, $vod);
+        #&post_notification($channel_name, $vod);
     }
     return 1;
 }
@@ -485,7 +485,7 @@ sub post_notification() {
 
     my $uriTitle = &PeePoo::uri_encode($video);
     my $clean    = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s[｜\|].*$/i;
-    my $link = qq{$storage_bucket_pubDir/$uriTitle};
+    #my $link = qq{$storage_bucket_pubDir/$uriTitle};
     $video  =~ s/$clean/$1/;
     my $notification = qq{$video\n$link};
 
