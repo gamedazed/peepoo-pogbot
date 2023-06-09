@@ -487,13 +487,13 @@ sub post_notification() {
     my $clean    = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s[｜\|].*$/i;
     #my $link = qq{$storage_bucket_pubDir/$uriTitle};
     $video  =~ s/$clean/$1/;
-    my $notification = qq{$video\n$link};
+    #my $notification = qq{$video\n$link};
 
-    foreach my $url (@urls) {
-        my $hook = WebService::Discord::Webhook->new( $url );
-        $hook->get();
-        $hook->execute( content => $notification );
-    }
+    #foreach my $url (@urls) {
+    #    my $hook = WebService::Discord::Webhook->new( $url );
+    #    $hook->get();
+    #    $hook->execute( content => $notification );
+    #}
 }
 
 ##################################################################################
