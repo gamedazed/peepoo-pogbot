@@ -103,7 +103,7 @@ sub poll() {
     $fm_poll->run_on_wait(sub {
         foreach my $pid (keys %{$streams{pid}}) {
             my $channel_name = $streams{pid}{$pid}{channel};
-            next if $channel_name eq 'parent';
+            next if $channel_name eq 'Parent';
             &PeePoo::printl(q{info}, qq{$channel_name ($pid)});
         }        
         # Print files modified over the past 1800 minutes
