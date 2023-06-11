@@ -44,6 +44,7 @@ my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 my $browser         =   q{firefox};
 my $localMntPoint   =   q{/nas};
 my $home            =   q{/home/gamedazed};
+my $useHW_Encoding  =   q{1};
 my $localOutPath    =   q{/videos/Captures/};
 my $gcsMountPoint   =   q{/gdrive};
 my $gcsBucketName   =   q{pub};
@@ -221,12 +222,26 @@ sub get_vod_cmd() {
     #--network 'shitting_and_farting' -v nas_share:/nas/             \\
     # xychelsea/ffmpeg-nvidia:latest                                 \\
     my $cmd = q{ffmpeg};
-    my $trigger_command = qq{ -i $outputDir/'$video'                  \\
-    -i $outputDir/'$chat'                                             \\
-    -filter_complex hstack -preset veryfast -vsync 2                  \\
-    $gcsMountPoint/$channel_name/'$vod' };
-    &PeePoo::printl(q{debug}, qq{\n\n(pogvodbot command):\n$cmd\n\n});
-    return $cmd . $trigger_command;
+    if ($useHW_Encoding){
+        my $trigger_command = 
+        qq{ -y -vsync 2  -hwaccel cuda -i $outputDir/'$video'        \\
+        -i $outputDir/'$chat'                                        \\
+        -filter_complex hstack                                       \\
+        -c:a copy          -c:v h264_nvenc          -crf 20          \\
+        -tune hq -b:v 5M   -bufsize 5M              -maxrate 10M     \\
+        -qmin 0 -bf 3      -b_ref_mode middle       -temporal-aq 1   \\
+        -rc-lookahead 20   $gcsMountPoint/$channel_name/'$vod' };
+        &PeePoo::printl(q{debug}, qq{\n\n(pogvodbot command):\n$cmd\n\n});
+        return $cmd . $trigger_command;
+    }
+    else {
+        my $trigger_command = qq{ -i $outputDir/'$video'                  \\
+        -i $outputDir/'$chat'                                             \\
+        -filter_complex hstack -preset veryfast -vsync 2                  \\
+        $gcsMountPoint/$channel_name/'$vod' };
+        &PeePoo::printl(q{debug}, qq{\n\n(pogvodbot command):\n$cmd\n\n});
+        return $cmd . $trigger_command;
+    }
 }
 
 sub live_trigger() {
@@ -235,8 +250,9 @@ sub live_trigger() {
     chomp $channel_name;
 
     my $outputDir = $localMntPoint . $localOutPath . $channel_name; # i.e. /nas/videos/Captures/lordaethelstan
-    print qx{mkdir -vp $outputDir} unless -d $outputDir;            # create the subdirectory for the channel if it doesn't exist
-    print qx{mkdir -vp $gcsMountPoint/$channel_name} unless -d qq{$gcsMountPoint/$channel_name}; # i.e. /downloads/lordaethelstan
+    foreach my $dir ($outputDir, qq{$gcsMountPoint/$channel_name}) {
+        print qx{mkdir -vp $dir} unless -d $dir;
+    }
     my $timestamp = &PeePoo::timestamp(q{yyyy_mm_dd-hh:mm:ss});     # i.e. 2023_05_30-16:22:30
 
     my $live_record = &get_watchbot_cmd($channel_name, $outputDir);
@@ -244,17 +260,23 @@ sub live_trigger() {
     my ($liveRecord_executionStatus, $liveRecored_returnOutput, $liveRecord_returnCode) = &PeePoo::printxl($live_record);
     &PeePoo::printl(q{notice}, qq{\n - The recording completed as a $liveRecord_executionStatus with exit code $liveRecord_returnCode.\n});
     &wait_for_finalization($channel_name); # While yt-dlp is writing for the channel in question, wait 10 seconds and check again;
-
+    if ($liveRecord_executionStatus eq q{error}) {
+        &PeePoo::printl(q{error}, qq{Exiting out early - YT-DLP returned an error\n\--- $liveRecord_returnCode ---\n$liveRecord_executionStatus});
+        return qq{Failed with code $liveRecord_returnCode\n}
+    }
+    
     my $video = &get_fn($outputDir, q{.mp4});
     $video =~ s/_chat\.mp4$/\.mp4/; # if a chat file was the most recently written
     &PeePoo::printl(q{notice}, qq{    * Filename: $video});
-    $video =~ s/\.temp//;     # .temp is used when finalizing   (Could be latest file if still finalizing)
-    $video =~ s/\.part//;     # .part is used when downloading  (Could be latest file if stream crashed)
-    $video =~ s/[\p{Sc}!]//g; # Santizing unicode characters and exclamations from the video name for fewer unexpected errors and easier remediation
+    $video =~ s/\.temp//;           # .temp is used when finalizing   (Could be latest file if still finalizing)
+    $video =~ s/\.part//;           # .part is used when downloading  (Could be latest file if stream crashed)
+    $video =~ s/[\p{Sc}!]//g;       # Santizing unicode characters and exclamations
     &PeePoo::printl(q{notice}, qq{    * Santized Filename: $video});
-    &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'}) unless $video =~ m/^\Q$timestamp\E/;
-    $video = qq{$timestamp.$video} if -f qq{$outputDir/$timestamp.$video};
-    &PeePoo::printl(q{notice}, qq{    * Timestamped Filename: $video});
+    unless (&matches_timestamp($video)){
+        &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'}) unless &matches_timestamp($video);
+        $video = qq{$timestamp.$video} if -f qq{$outputDir/$timestamp.$video};
+        &PeePoo::printl(q{notice}, qq{    * Timestamped Filename: $video});
+    }
     (my $chat = $video) =~ s/\.(\w{3})$/_chat/;
     (my $vod = $video)  =~ s/\.(\w{3})$/_fullvod.$1/;
 
@@ -270,27 +292,46 @@ sub live_trigger() {
         # If you don't have a VOD ID, as can happen when vods aren't saved on a channel, just move the vod recording to the cloud storage
         &PeePoo::printxl(qq{mv -v $video $gcsMountPoint/$channel_name/$video});
         #&post_notification($channel_name, $video);
-        return 1;
+        return 154;
     }
     
     my $chatDownloadCmd = &get_chatdownload_cmd($channel_name, $outputDir, qq{$chat.json}, $vod_id);
     &PeePoo::printl(q{notice}, qq{\n(chat Download) executing $chatDownloadCmd\n});
     my ($chatDownload_executionStatus, $chatDownload_returnOutput, $chatDownload_returnCode) = &PeePoo::printxl($chatDownloadCmd);
-    &PeePoo::printl(q{notice}, qq{ - Chat has finished downloading\n});
+    if ($chatDownload_executionStatus eq q{success}) {
+        &PeePoo::printl(q{notice}, qq{ - Chat has finished downloading\n});
 
-    my ($height, $width) = &generate_ratio(qq{$outputDir/$video});
-    my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4}, $height, $width);
-    &PeePoo::printl(q{notice}, qq{\n(chat render) executing $twitchifyCmd\n});
-    my ($chatRender_executionStatus, $chatRender_returnOutput, $chatRender_returnCode) = &PeePoo::printxl($twitchifyCmd);
-    &PeePoo::printl(q{notice}, qq{ - Chat has finished rendering\n});
-    &PeePoo::printxl(qq{rm -v $outputDir/'$chat.json'}) if $chatRender_executionStatus =~ m/success/i;
+        my ($height, $width) = &generate_ratio(qq{$outputDir/$video});
+        my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4}, $height, $width);
+        &PeePoo::printl(q{notice}, qq{\n(chat render) executing $twitchifyCmd\n});
+        my ($chatRender_executionStatus, $chatRender_returnOutput, $chatRender_returnCode) = &PeePoo::printxl($twitchifyCmd);
+        if ($chatRender_executionStatus eq q{success}) {
+            &PeePoo::printl(q{notice}, qq{ - Chat has finished rendering\n});
+            &PeePoo::printxl(qq{rm -v $outputDir/'$chat.json'});
 
-    my $vodCmd = &get_vod_cmd($channel_name, $outputDir, qq{$chat.mp4}, $video, $vod);
-    &PeePoo::printl(q{notice}, qq{\n(Concat Chat & VOD) executing $vodCmd\n});
-    my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd);
-    &PeePoo::printl(q{notice}, qq{ - Video & Chat Concat Completed - FullVOD finalized\n});
-    system(qq{rm -v $outputDir/'$chat.mp4' $outputDir/'$video'*}) if $fullVOD_executionStatus =~ m/success/i;
-    # Let's hold off on deleting these until we get a few wins behind our belt
+            my $vodCmd = &get_vod_cmd($channel_name, $outputDir, qq{$chat.mp4}, $video, $vod);
+            &PeePoo::printl(q{notice}, qq{\n(Concat Chat & VOD) executing $vodCmd\n});
+            my ($fullVOD_executionStatus, $fullVOD_returnOutput, $fullVOD_returnCode) = &PeePoo::printxl($vodCmd);
+            &PeePoo::printl(q{notice}, qq{ - Video & Chat Concat Completed - FullVOD finalized\n});
+            system(qq{rm -v $outputDir/'$chat.mp4' $outputDir/'$video'*}) if $fullVOD_executionStatus eq q{success};
+        }
+        else{
+            &PeePoo::printl (q{warning}, qq{The render of Chat failed, the fullVOD will not be able to be generated without intervention\n}
+            . qq{\n$chatDownload_returnOutput\n}
+            . qq{\tReturn Code $chatDownload_returnCode\n}
+            . qq{\n\nMoving the VOD to the destination folder and exiting out early\n});
+            &PeePoo::printxl(qq{mv -v $outputDir/'$video' $gcsMountPoint/$channel_name/'$video'});
+            return 1;
+        }
+    }
+    else {
+        &PeePoo::printl (q{warning}, qq{The download of Chat failed, the fullVOD will not be able to be generated without intervention\n}
+        . qq{\n$chatDownload_returnOutput\n}
+        . qq{\tReturn Code $chatDownload_returnCode\n}
+        . qq{\n\nMoving the VOD to the destination folder and exiting out early\n});
+        &PeePoo::printxl(qq{mv -v $outputDir/'$video' $gcsMountPoint/$channel_name/'$video'});
+        return 154;
+    }
 
     if (-f qq{/downloads/$channel_name/$vod}) {
         #&post_notification($channel_name, $vod);
@@ -372,6 +413,13 @@ sub get_vod_id() {
             &get_vod_id($channel_name);
         }
     }
+}
+
+sub matches_timestamp() {
+    my $fn = shift;
+    # Matches pretty much any timestamp with a date and time
+    return 1 if $fn =~ m/([a-zA-Z]{2}+:?)([\W_]?)([a-zA-Z]{2}+:?)([\W_]?)([a-zA-Z]{2,4}+:?)([-_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?/;
+    return 0;
 }
 
 sub prune_headless_chromium() {

@@ -180,13 +180,13 @@ sub printxl() {
         $returnCode = $? >> 8;
     }
     if (defined $error || defined $sysError) {
-        $executionStatus = q{failed};
+        $executionStatus = q{error};
         $error    = q{} unless defined $error;
         $sysError = q{} unless defined $sysError;
         $returnOutput .= qq{\n$error\n$sysError\n};
     }
     elsif ($returnCode) {
-        $executionStatus = q{failed};
+        $executionStatus = q{RCnonzero};
         $printVerbosity  = q{warning}
     }
     chomp $returnOutput;
