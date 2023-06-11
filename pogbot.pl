@@ -119,6 +119,9 @@ sub poll() {
     #####################################################################
     POLL:
     foreach my $channel_name (@watching) {
+        # Restart based on the non-running pid's channel name, not array index
+        next if qx{ps aux | grep $streams{channel}{$channel_name}{pid} | grep -v grep | wc -l | tr -d "\n"};
+
         my $pid = $fm_poll->start($channel_name) and next POLL;
         $streams{channel}{$channel_name}{pid} = $pid;
         $streams{pid}{$pid}{channel} = $channel_name;
