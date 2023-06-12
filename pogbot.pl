@@ -373,8 +373,11 @@ sub start_headless_chromium() {
     -f qq{$home/bin/docker}          ?
       $docker = qq{$home/bin/docker} :
       $docker = q{docker}            ;
-    &PeePoo::printxl(qq{$docker run -d --restart=unless-stopped  --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
-    sleep 5;
+    my ($status, $output, $rc) = &PeePoo::printxl(qq{$docker start peepooemu});
+    if ($status ne 'success') {
+        &PeePoo::printxl(qq{$docker run -d --restart=unless-stopped  --name=peepooemu -p 9222:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
+        sleep 5;
+    }
 }
 
 sub get_vod_id() {
