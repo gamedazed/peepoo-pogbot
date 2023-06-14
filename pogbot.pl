@@ -204,10 +204,10 @@ sub get_chatrender_cmd() {
     my $cmd = q{TwitchDownloaderCLI };
     
     my $trigger_command = qq{chatrender }
-    . qq{-i "$outputDir/$chatIn" }
+    . qq{-i $outputDir/'$chatIn' }
     . qq{--outline --font-size 17 --skip-drive-waiting }
     . qq{-h $height -w $width  }
-    . qq{--output "$outputDir/$chatOut"};
+    . qq{--output $outputDir/'$chatOut'};
     &PeePoo::printl(q{debug}, qq{\n\n(twitchify command):\n$cmd\n\n});
 
     return $cmd . $trigger_command;
@@ -276,7 +276,7 @@ sub live_trigger() {
     $video =~ s/[\p{Sc}!]//g;       # Santizing unicode characters and exclamations
     &PeePoo::printl(q{notice}, qq{    * Santized Filename: $video});
     unless (&matches_timestamp($video)){
-        &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'}) unless &matches_timestamp($video);
+        &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'});
         $video = qq{$timestamp.$video} if -f qq{$outputDir/$timestamp.$video};
         &PeePoo::printl(q{notice}, qq{    * Timestamped Filename: $video});
     }
@@ -424,8 +424,8 @@ sub get_vod_id() {
 sub matches_timestamp() {
     my $fn = shift;
     # Matches pretty much any timestamp with a date and time
-    return 1 if $fn =~ m/([a-zA-Z]{2}+:?)([\W_]?)([a-zA-Z]{2}+:?)([\W_]?)([a-zA-Z]{2,4}+:?)([-_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?/;
-    return 0;
+    return 0 if $fn =~ m/([a-zA-Z]{2}+:?)([\W_]?)([a-zA-Z]{2}+:?)([\W_]?)([a-zA-Z]{2,4}+:?)([-_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?/;
+    return 1;
 }
 
 sub prune_headless_chromium() {
@@ -555,6 +555,7 @@ sub post_notification() {
 ##################################################################################
 
 $streams{pid}{$$}{channel} = q{Parent};
+system(qq{google-drive-ocamlfuse $gcsMountPoint}) unless -d qq{$gcsMountPoint/$gcsBucketName};
 &prune_headless_chromium();
 &start_headless_chromium();
 &main(@ARGV);
