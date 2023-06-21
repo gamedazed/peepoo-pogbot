@@ -302,6 +302,44 @@ sub human_time() {
     return "$human_readable\n";
 }
 
+sub get_video_duration() {
+    my $filename = shift;
+    my $duration = qx{ffprobe -i $filename 2>&1 | grep -oP '(\\d{2}[:\\.]){3}\\d\\d' | tr -d "\\n"};
+    return $duration;
+}
+
+sub duration_to_seconds() {
+    use Math::Round qw(:all);
+    my $duration = shift;
+    if ($duration =~ m/(\d{2}):(\d{2}):(\d{2})\.(\d+)/) {
+        my $hours   = $1;
+        my $minutes = $2;
+        my $seconds = $3;
+        my $msecs   = $4;
+
+        $minutes += ($hours   * 60);
+        $seconds += ($minutes * 60);
+        $seconds += nearest(1, $msecs);
+        return $seconds;
+    }
+}
+
+sub duration_difference() {
+    my $t1 = shift;
+    my $t2 = shift;
+    if (!defined $t2 || !defined $t1 || $t1 !~ m/^\d+$/ || $t2 !~ m/^\d+$/) {
+        &printl('error', qq{Must specify two parameters and both must be integers in seconds\n});
+        return undef;
+    }
+
+    if ($t1 > $t2) {
+        return $t1 - $t2;
+    }
+    elsif ($t2 > $t1) {
+        return $t2 - $t1;
+    }
+}
+
 # Given a human timestamp format, provide that format in a way that the date command can use to format
 sub get_tsf() {
     my $append = shift;

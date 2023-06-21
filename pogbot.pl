@@ -120,7 +120,8 @@ sub poll() {
     POLL:
     foreach my $channel_name (@watching) {
         # Restart based on the non-running pid's channel name, not array index
-        next if qx{ps aux | grep $streams{channel}{$channel_name}{pid} | grep -v grep | wc -l | tr -d "\n"};
+        my $running = qx{ps aux | grep $channel_name | grep -v grep | wc -l | tr -d "\n"};
+        next if $running;
 
         my $pid = $fm_poll->start($channel_name) and next POLL;
         $streams{channel}{$channel_name}{pid} = $pid;
@@ -196,15 +197,17 @@ sub get_chatrender_cmd() {
     my $chatOut       = shift;
     my $height        = shift;
     my $width         = shift;
+    my $offset        = shift;
     # my $cmd = qq{docker run --rm -it }
     # . qq{--name "$channel_name-peepootwitchybot" }
     # . qq{-e running_application='twitch-downloader-cli' }
     # . qq{--network 'shitting_and_farting' -v nas_share:/nas/ }
     # . qq{ bxggs/twitch-downloader-cli:latest };
     my $cmd = q{TwitchDownloaderCLI };
+    $offset = -1 if $offset == 0;
 
     my $trigger_command = qq{chatrender }
-    . qq{-i $outputDir/'$chatIn' }
+    . qq{-i $outputDir/'$chatIn' -b $offset }
     . qq{--outline --font-size 17 --skip-drive-waiting }
     . qq{-h $height -w $width  }
     . qq{--output $outputDir/'$chatOut'};
@@ -273,8 +276,12 @@ sub live_trigger() {
     &PeePoo::printl(q{notice}, qq{    * Filename: $video});
     $video =~ s/\.temp//;           # .temp is used when finalizing   (Could be latest file if still finalizing)
     $video =~ s/\.part//;           # .part is used when downloading  (Could be latest file if stream crashed)
+    my $default = $video;
     $video =~ s/[\p{Sc}!]//g;       # Santizing unicode characters and exclamations
     &PeePoo::printl(q{notice}, qq{    * Santized Filename: $video});
+    if (-f qq{$outputDir/$default}) {
+        &PeePoo::printxl(qq{mv -v $outputDir/'$default' $outputDir/'$video'})
+    }
     unless (&matches_timestamp($video)){
         &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'});
         $video = qq{$timestamp.$video} if -f qq{$outputDir/$timestamp.$video};
@@ -304,8 +311,9 @@ sub live_trigger() {
     if ($chatDownload_executionStatus eq q{success}) {
         &PeePoo::printl(q{notice}, qq{ - Chat has finished downloading\n});
 
+        my $offset = &trim_chat_by(qq{$outputDir/$video}, qq{$outputDir/$chat});
         my ($height, $width) = &generate_ratio(qq{$outputDir/$video});
-        my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4}, $height, $width);
+        my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4}, $height, $width, $offset);
         &PeePoo::printl(q{notice}, qq{\n(chat render) executing $twitchifyCmd\n});
         my ($chatRender_executionStatus, $chatRender_returnOutput, $chatRender_returnCode) = &PeePoo::printxl($twitchifyCmd);
         if ($chatRender_executionStatus eq q{success}) {
@@ -366,6 +374,46 @@ sub generate_ratio() {
     }
 }
 
+sub trim_chat_by() {
+    my $vod  = shift;
+    my $chat = shift;
+    my $duration1 = &PeePoo::Duration_to_seconds(&PeePoo::get_video_duration($vod));
+    my $duration2;
+    if ($chat =~ m/json$/) {
+        $duration2 = &get_chat_json_duration($chat);
+        my $diff = &PeePoo::duration_difference($duration1, $vod);
+    }
+    elsif($chat =~ m/mp4$/) {
+        $duration2 = &PeePoo::Duration_to_seconds(&PeePoo::get_video_duration($chat));
+    }
+    my $diff = &PeePoo::duration_difference($duration2, $duration1);
+    # TwitchDownloaderCLI option is -b to crop beginning of the video
+    return $diff;
+}
+
+sub get_chat_json_duration() {
+    my $chat = shift;
+    my $duration = qx{grep -oP '"end":\\d{4,}' $chat | sed 's/"end"://' | tr -d "\\n"};
+    if (!$duration) {
+        &PeePoo::printl('warning', qq{Searching $chat for "end" did not result in a timestamp\nTrying using Duration...\n});
+        $duration = qx{grep -oP '"duration": "((\\d+h)?(\\d+m)?(\\d+s)?)+"' | sed 's/"duration": //' | tr -d "\\n"};
+        if ($duration =~ m/(\d*)h(\d*)m(\d*)s/) {
+            my $hours = $1;
+            my $minutes = $2;
+            my $seconds = $3;
+            $minutes += ($hours   * 60);
+            $seconds += ($minutes * 60);
+            return $seconds;
+        }
+        else {
+            return q{};
+        }
+    }
+    else {
+        return $duration;
+    }
+}
+
 ############################################################################
 
 sub start_headless_chromium() {
@@ -413,10 +461,13 @@ sub get_vod_id() {
             $try++;
             &get_vod_id($channel_name, $try);
         }
+        elsif ($try > 9000) {
+            return undef;
+        }
         else {
             &prune_headless_chromium();
             &start_headless_chromium();
-            &get_vod_id($channel_name);
+            &get_vod_id($channel_name, 40000000);
         }
     }
 }
