@@ -37,7 +37,7 @@ use PeePoo;
 use Parallel::ForkManager;
 use WWW::Twitch;
 
-my @watch_list = qw{lordaethelstan aethelworld};
+my @watch_list = qw{lordaethelstan aethelworld nyanners pinkcatbad};
 my $fm_poll    = new Parallel::ForkManager(scalar(@watch_list));
 
 #################################### Compatability ####################################
