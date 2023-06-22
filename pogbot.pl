@@ -379,7 +379,7 @@ sub trim_chat_by() {
     my $chat = shift;
     my $duration1 = &PeePoo::duration_to_seconds(&PeePoo::get_video_duration($vod));
     my $duration2;
-    if ($chat =~ m/json$/) {
+    if ($chat =~ m/json['"]*$/) {
         $duration2 = &get_chat_json_duration($chat);
     }
     elsif($chat =~ m/mp4$/) {
