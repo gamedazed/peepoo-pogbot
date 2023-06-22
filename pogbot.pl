@@ -344,8 +344,8 @@ sub live_trigger() {
         return 154;
     }
 
-    if (-f qq{/downloads/$channel_name/$vod}) {
-        #&post_notification($channel_name, $vod);
+    if (-f qq{$gcsMountPoint/$gcsBucketName/$channel_name/'$video'}) {
+        &post_notification($channel_name, $vod);
     }
     return 1;
 }
@@ -574,17 +574,17 @@ sub post_notification() {
     my $channel_name = shift;
     my $video = shift;
     my @urls;
-
-    my $dev_discord_url = $streams{channel}{$channel_name}{discord};
-    my $personal_discord_url = $streams{channel}{gamedazed}{discord};
-    foreach my $notification ($dev_discord_url, $personal_discord_url) {
-        # testing for definition and non-null before attempting to operate on it
-        if (defined $notification) {
-            if ($notification) {
-                push @urls, $notification;
-            }
-        }
-    }
+    push @urls, $streams{channel}{gamedazed}{discord};
+    #my $dev_discord_url = $streams{channel}{$channel_name}{discord};
+    #my $personal_discord_url = $streams{channel}{gamedazed}{discord};
+    #foreach my $notification ($dev_discord_url, $personal_discord_url) {
+    #    # testing for definition and non-null before attempting to operate on it
+    #    if (defined $notification) {
+    #        if ($notification) {
+    #            push @urls, $notification;
+    #        }
+    #    }
+    #}
 
     # gcp
     #my $storage_bucket_pubDir = qq{https://storage.googleapis.com/$gcsBucketName/$channel_name};
@@ -593,13 +593,14 @@ sub post_notification() {
     my $clean    = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s[｜\|].*$/i;
     #my $link = qq{$storage_bucket_pubDir/$uriTitle};
     $video  =~ s/$clean/$1/;
+    my $notification = qq{$channel_name: $video is ready\n};
     #my $notification = qq{$video\n$link};
 
-    #foreach my $url (@urls) {
-    #    my $hook = WebService::Discord::Webhook->new( $url );
-    #    $hook->get();
-    #    $hook->execute( content => $notification );
-    #}
+    foreach my $url (@urls) {
+        my $hook = WebService::Discord::Webhook->new( $url );
+        $hook->get();
+        $hook->execute( content => $notification );
+    }
 }
 
 ##################################################################################
