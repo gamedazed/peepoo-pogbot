@@ -276,7 +276,7 @@ sub timestamp() {
     return qx{date $converted | tr -d "\n"};
 }
 
-# Given two epochs, provide the difference in the most reduced version under day/hour/minute/second notation
+# Given a number of seconds, provide the value in the most reduced version under day/hour/minute/second notation
 sub human_time() {
     my $seconds = shift;
     my $human_readable = '';
