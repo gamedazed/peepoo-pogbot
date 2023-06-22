@@ -333,10 +333,14 @@ sub duration_difference() {
     }
 
     if ($t1 > $t2) {
-        return $t1 - $t2;
+        my $diff = $t1 - $t2;
+        &printl('debug', qq{Trimming $diff seconds from the beginning of the video\n});
+        return " -b $diff ";
     }
     elsif ($t2 > $t1) {
-        return $t2 - $t1;
+        my $diff = $t2 - $t1;
+        &printl('debug', qq{Trimming $diff seconds from the end of the video\n});
+        return " -e $diff ";
     }
 }
 

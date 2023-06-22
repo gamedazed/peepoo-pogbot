@@ -207,7 +207,7 @@ sub get_chatrender_cmd() {
     $offset = -1 if $offset == 0;
 
     my $trigger_command = qq{chatrender }
-    . qq{-i $outputDir/'$chatIn' -b $offset }
+    . qq{-i $outputDir/'$chatIn' $offset }
     . qq{--outline --font-size 17 --skip-drive-waiting }
     . qq{-h $height -w $width  }
     . qq{--output $outputDir/'$chatOut'};
@@ -280,7 +280,7 @@ sub live_trigger() {
     $video =~ s/[\p{Sc}!]//g;       # Santizing unicode characters and exclamations
     &PeePoo::printl(q{notice}, qq{    * Santized Filename: $video});
     if (-f qq{$outputDir/$default}) {
-        &PeePoo::printxl(qq{mv -v $outputDir/'$default' $outputDir/'$video'})
+        &PeePoo::printxl(qq{mv -v $outputDir/'$default' $outputDir/'$video'}) unless -f qq{$outputDir/'$video'};
     }
     unless (&matches_timestamp($video)){
         &PeePoo::printxl(qq{mv -v $outputDir/'$video' $outputDir/'$timestamp.$video'});
@@ -377,14 +377,13 @@ sub generate_ratio() {
 sub trim_chat_by() {
     my $vod  = shift;
     my $chat = shift;
-    my $duration1 = &PeePoo::Duration_to_seconds(&PeePoo::get_video_duration($vod));
+    my $duration1 = &PeePoo::duration_to_seconds(&PeePoo::get_video_duration($vod));
     my $duration2;
     if ($chat =~ m/json$/) {
         $duration2 = &get_chat_json_duration($chat);
-        my $diff = &PeePoo::duration_difference($duration1, $vod);
     }
     elsif($chat =~ m/mp4$/) {
-        $duration2 = &PeePoo::Duration_to_seconds(&PeePoo::get_video_duration($chat));
+        $duration2 = &PeePoo::duration_to_seconds(&PeePoo::get_video_duration($chat));
     }
     my $diff = &PeePoo::duration_difference($duration2, $duration1);
     # TwitchDownloaderCLI option is -b to crop beginning of the video
@@ -606,7 +605,7 @@ sub post_notification() {
 ##################################################################################
 
 $streams{pid}{$$}{channel} = q{Parent};
-system(qq{google-drive-ocamlfuse $gcsMountPoint}) unless -d qq{$gcsMountPoint/$gcsBucketName};
-&prune_headless_chromium();
-&start_headless_chromium();
+# system(qq{google-drive-ocamlfuse $gcsMountPoint}) unless -d qq{$gcsMountPoint/$gcsBucketName};
+# &prune_headless_chromium();
+# &start_headless_chromium();
 &main(@ARGV);
