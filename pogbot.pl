@@ -382,11 +382,10 @@ sub trim_chat_by() {
     if ($chat =~ m/json['"]*$/) {
         $duration2 = &get_chat_json_duration($chat);
     }
-    elsif($chat =~ m/mp4$/) {
+    elsif($chat =~ m/mp4['"]*$/) {
         $duration2 = &PeePoo::duration_to_seconds(&PeePoo::get_video_duration($chat));
     }
     my $diff = &PeePoo::duration_difference($duration2, $duration1);
-    # TwitchDownloaderCLI option is -b to crop beginning of the video
     return $diff;
 }
 
