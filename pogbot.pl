@@ -185,7 +185,7 @@ sub get_chatdownload_cmd() {
     my $trigger_command = qq{ chatdownload }
     . qq{-u $vod_id }
     . qq{--embed-images }
-    . qq{-o "$outputDir/$outputFile" };
+    . qq{-o $outputDir/'$outputFile' };
     &PeePoo::printl(q{debug}, qq{\n\n(chat download command):\n$cmd\n\n});
     return $cmd . $trigger_command;
 }
@@ -259,7 +259,7 @@ sub live_trigger() {
     foreach my $dir ($outputDir, qq{$gcsMountPoint/$gcsBucketName}) {
         print qx{mkdir -vp $dir} unless -d $dir;
     }
-    my $timestamp = &PeePoo::timestamp(q{yyyy_mm_dd-hh:mm:ss});     # i.e. 2023_05_30-16:22:30
+    my $timestamp = &PeePoo::timestamp(q{yyyy_mm_dd-hh.mm.ss});     # i.e. 2023_05_30-16:22:30
 
     my $live_record = &get_watchbot_cmd($channel_name, $outputDir);
     &PeePoo::printl(q{notice}, qq{executing $live_record});
@@ -395,7 +395,7 @@ sub get_chat_json_duration() {
     my $duration = qx{grep -oP '"end":\\d{4,}' $chat | sed 's/"end"://' | tr -d "\\n"};
     if (!$duration) {
         &PeePoo::printl('warning', qq{Searching $chat for "end" did not result in a timestamp\nTrying using Duration...\n});
-        $duration = qx{grep -oP '"duration": "((\\d+h)?(\\d+m)?(\\d+s)?)+"' | sed 's/"duration": //' | tr -d "\\n"};
+        $duration = qx{grep -oP '"duration": "((\\d+h)?(\\d+m)?(\\d+s)?)+"' $chat | sed 's/"duration": //' | tr -d "\\n"};
         if ($duration =~ m/(\d*)h(\d*)m(\d*)s/) {
             my $hours = $1;
             my $minutes = $2;
