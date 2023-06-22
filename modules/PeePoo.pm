@@ -311,7 +311,7 @@ sub get_video_duration() {
 sub duration_to_seconds() {
     use Math::Round qw(:all);
     my $duration = shift;
-    if ($duration =~ m/(\d{2}):(\d{2}):(\d{2})\.(\d+)/) {
+    if ($duration =~ m/(\d{2}):(\d{2}):(\d{2})(\.\d+)/) {
         my $hours   = $1;
         my $minutes = $2;
         my $seconds = $3;
