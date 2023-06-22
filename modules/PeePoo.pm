@@ -280,25 +280,35 @@ sub timestamp() {
 sub human_time() {
     my $seconds = shift;
     my $human_readable = '';
+    my $layers = 1;
     my ($days, $hours, $minutes);
     if ($seconds >= 86400) {
         $days = ($seconds - ($seconds % 86400)) / 86400;
+        $human_readable .= "$days Day "  if $days == 1;
+        $human_readable .= "$days Days " unless $days == 1;
+        $layers++;
         $seconds = $seconds % 86400;
     }
     if ($seconds >= 3600) {
         $hours = ($seconds - ($seconds % 3600)) / 3600;
+        $human_readable .= "$hours Hour "  if $hours == 1;
+        $human_readable .= "$hours Hours " unless $hours == 1;
+        $layers++;
         $seconds = $seconds % 3600;
     }
     if ($seconds >= 60) {
         $minutes = ($seconds - ($seconds % 60)) / 60;
+        $human_readable .= "$minutes Minute "  if $minutes == 1;
+        $human_readable .= "$minutes Minutes " unless $minutes == 1;
+        $layers++;
         $seconds = $seconds % 60;
     }
-    my $layers = 1;
-    $human_readable .= "$days Days " and ++$layers if defined $days;
-    $human_readable .= "$hours Hours " and ++$layers if defined $hours;
-    $human_readable .= "$minutes Minutes " and ++$layers if defined $minutes;
-    $human_readable .= "$seconds Seconds" if $seconds > 0;
-    $human_readable =~ s/(\d+\s[DHMS]\w+)$/and $1/ if $layers > 1;
+    if ($seconds > 0) {
+        $human_readable .= "$seconds Second"  if $seconds == 1;
+        $human_readable .= "$seconds Seconds" unless $seconds == 1;
+    }
+    $human_readable =~ s/(\d+\s[DHMS]\w+)\s?$/and $1/ if $layers > 1;
+    $human_readable =~ s/(([^a][^n][^d]\s)?[DHMS]\w+)\s/$1, /g if $layers > 2;
     return "$human_readable";
 }
 
