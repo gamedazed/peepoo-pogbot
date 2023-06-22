@@ -311,7 +311,7 @@ sub live_trigger() {
     if ($chatDownload_executionStatus eq q{success}) {
         &PeePoo::printl(q{notice}, qq{ - Chat has finished downloading\n});
 
-        my $offset = &trim_chat_by(qq{$outputDir/$video}, qq{$outputDir/$chat});
+        my $offset = &trim_chat_by(qq{$outputDir/'$video'}, qq{$outputDir/'$chat'});
         my ($height, $width) = &generate_ratio(qq{$outputDir/$video});
         my $twitchifyCmd = &get_chatrender_cmd($channel_name, $outputDir, qq{$chat.json}, qq{$chat.mp4}, $height, $width, $offset);
         &PeePoo::printl(q{notice}, qq{\n(chat render) executing $twitchifyCmd\n});
