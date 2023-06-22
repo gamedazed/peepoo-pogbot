@@ -299,7 +299,7 @@ sub human_time() {
     $human_readable .= "$minutes Minutes " and ++$layers if defined $minutes;
     $human_readable .= "$seconds Seconds" if $seconds > 0;
     $human_readable =~ s/(\d+\s[DHMS]\w+)$/and $1/ if $layers > 1;
-    return "$human_readable\n";
+    return "$human_readable";
 }
 
 sub get_video_duration() {
@@ -334,12 +334,14 @@ sub duration_difference() {
 
     if ($t1 > $t2) {
         my $diff = $t1 - $t2;
-        &printl('debug', qq{Trimming $diff seconds from the beginning of the video\n});
+        my $readable = &human_time($diff);
+        &printl('debug', qq{Trimming $diff seconds ($readable) from the beginning of the video\n});
         return " -b $diff ";
     }
     elsif ($t2 > $t1) {
         my $diff = $t2 - $t1;
-        &printl('debug', qq{Trimming $diff seconds from the end of the video\n});
+        my $readable = &human_time($diff);
+        &printl('debug', qq{Trimming $diff seconds ($readable) from the end of the video\n});
         return " -e $diff ";
     }
 }
