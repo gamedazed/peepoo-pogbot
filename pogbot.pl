@@ -236,7 +236,7 @@ sub get_vod_cmd() {
         -c:a copy          -c:v h264_nvenc          -crf 20          \\
         -tune hq -b:v 5M   -bufsize 5M              -maxrate 10M     \\
         -qmin 0 -bf 3      -b_ref_mode middle       -temporal-aq 1   \\
-        -rc-lookahead 20   $gcsMountPoint/$channel_name/'$vod' };
+        -rc-lookahead 20   $gcsMountPoint/$gcsBucketName/$channel_name/'$vod' };
         &PeePoo::printl(q{debug}, qq{\n\n(pogvodbot command):\n$cmd\n\n});
         return $cmd . $trigger_command;
     }
