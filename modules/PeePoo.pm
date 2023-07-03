@@ -43,6 +43,38 @@ our $logLevel        = q{debug};
 our $logFile         = q{log.log};
 our $timestampFormat = q{iso8601};
 $ENV{TEMP}           = q{/tmp};
+our $browser         =   q{firefox};
+our $localMntPoint   =   q{/nas};
+our $home            =   q{/home/gamedazed};
+our $useHW_Encoding  =   q{1};
+our $localOutPath    =   q{/videos/Captures/};
+our $gcsMountPoint   =   q{/gdrive};
+our $gcsBucketName   =   q{pub};
+our $gcsLogFile      =   qq{$home/gcsfuse.log};
+our $authorization   =   qq{$home/revod-364904-c9d09a09225b.json};
+our %streams=(
+    channel =>  {
+        lordaethelstan  =>  {
+            userid      =>  q{1665175701},
+            discord     =>  qx{cat $home/.webhook | tr -d "\n"},
+        },
+        aethelworld     =>  {
+            discord     =>  qx{cat $home/.webhook | tr -d "\n"},
+        },
+        gamedazed       =>  {
+            discord     =>  qx{cat $home/personal_server.webhook | tr -d "\n"},
+        },
+        nyanners        =>  {
+            userid      =>  q{82350088}
+        },
+        tobs            =>  {
+            userid      =>  q{598826002}
+        },
+        coqui           =>  {
+            userid      =>  q{633385488}
+        }
+    }
+);
 
 my $authKey = q{};
 my $apiUrl  = q{};
@@ -238,6 +270,7 @@ sub compare_intensity() {
     my %severity = (
         debug   =>  4,
         info    =>  3,
+        notice  =>  3,
         warning =>  2,
         error   =>  1,
         critical=>  0,
@@ -314,7 +347,7 @@ sub human_time() {
 
 sub get_video_duration() {
     my $filename = shift;
-    my $duration = qx{ffprobe -i $filename 2>&1 | grep -oP '(\\d{2}[:\\.]){3}\\d\\d' | tr -d "\\n"};
+    my $duration = qx{ffprobe -i $filename 2>&1 | grep -oP 'Duration: (\\d{2}[:\\.]){3}\\d\\d' | sed 's/Duration: //' | tr -d "\\n"};
     return $duration;
 }
 
@@ -510,7 +543,7 @@ sub option_heiphenate() {
             return qq{ --$paramName };
         }
     }
-    return &PeePoo::printl(q{warning}, qq{Didn't determine what kind of heiphenation was appropriate here ($paramName)});
+    return &printl(q{warning}, qq{Didn't determine what kind of heiphenation was appropriate here ($paramName)});
 }
 
 sub uri_encode() {
@@ -526,5 +559,390 @@ sub fuckit() {
     $f =~ s/%21/!/g;
     return $f;
 }
+
+
+sub get_watchbot_cmd() {
+    my $channel_name = shift;
+    my $outputDir = shift;
+
+    my $ua  = q{Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0};
+    my $jar = qq{$home/cookies.sqlite};
+    my $o   = qq{ -o "$outputDir/%(uploader)s-%(description)s.%(ext)s"};
+
+    # my $cmd = qq{docker run --rm --name=${channel_name}-peepoowatchbot } .
+    #   q{-e running_application='yt-dlp' --network 'shitting_and_farting' } .
+    #   q{jauderho/yt-dlp:latest};
+    my $cmd = q{yt-dlp};
+    my $trigger_command = qq{                \\
+    --sub-langs live_chat                    \\
+    --hls-prefer-native                      \\
+    --allow-dynamic-mpd                      \\
+    --hls-split-discontinuity                \\
+    --concurrent-fragments 5                 \\
+    --write-subs   -vvv                      \\
+    --user-agent '$ua'                       \\
+    --cookies $jar                           \\
+    https://twitch.tv/$channel_name          \\
+    --wait-for-video 1 $o    };
+
+    &printl(q{debug}, qq{\n\n(watchbot command):\n$cmd $trigger_command\n\n});
+    return qq{$cmd $trigger_command}
+}
+
+sub get_chatdownload_cmd() {
+    my $channel_name = shift;
+    my $outputDir    = shift;
+    my $outputFile   = shift;
+    my $vod_id       = shift;
+    # my $cmd = qq{docker run --rm -it }
+    # . qq{--name "$channel_name-peepootwitchybot" }
+    # . qq{-e running_application='twitch-downloader-cli' }
+    # . qq{--network 'shitting_and_farting' -v nas_share:/nas/ }
+    # . qq{ bxggs/twitch-downloader-cli:latest };
+    my $cmd = q{TwitchDownloaderCLI};
+    my $trigger_command = qq{ chatdownload }
+    . qq{-u $vod_id }
+    . qq{--embed-images }
+    . qq{-o $outputDir/'$outputFile' };
+    &printl(q{debug}, qq{\n\n(chat download command):\n$cmd\n\n});
+    return $cmd . $trigger_command;
+}
+
+sub get_chatrender_cmd() {
+    my $channel_name  = shift;
+    my $outputDir     = shift;
+    my $chatIn        = shift;
+    my $chatOut       = shift;
+    my $height        = shift;
+    my $width         = shift;
+    my $offset        = shift;
+    # my $cmd = qq{docker run --rm -it }
+    # . qq{--name "$channel_name-peepootwitchybot" }
+    # . qq{-e running_application='twitch-downloader-cli' }
+    # . qq{--network 'shitting_and_farting' -v nas_share:/nas/ }
+    # . qq{ bxggs/twitch-downloader-cli:latest };
+    my $cmd = q{TwitchDownloaderCLI };
+    $offset = '' unless defined $offset;
+
+    my $trigger_command = qq{chatrender }
+    . qq{-i $outputDir/'$chatIn' $offset }
+    . qq{--ffmpeg-path /mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/ffmpeg.exe }  # Until build option causing chatrender to fail is fixed, see https://github.com/lay295/TwitchDownloader/issues/753
+    . qq{--outline --font-size 17 --skip-drive-waiting }
+    . qq{-h $height -w $width  }
+    . qq{--output $outputDir/'$chatOut'};
+    &printl(q{debug}, qq{\n\n(twitchify command):\n$cmd\n\n});
+
+    return $cmd . $trigger_command;
+}
+
+sub get_vod_cmd() {
+    my $channel_name = shift;
+    my $outputDir    = shift;
+    my $chat         = shift;
+    my $video        = shift;
+    my $vod          = shift;
+    #my $cmd = qq{docker run --rm -it                                \\
+    #--name $channel_name-pogvodbot                                  \\
+    #-e running_application='ffmpeg'                                 \\
+    #--network 'shitting_and_farting' -v nas_share:/nas/             \\
+    # xychelsea/ffmpeg-nvidia:latest                                 \\
+    my $cmd = q{ffmpeg};
+    if ($useHW_Encoding){
+        my $trigger_command =
+        qq{ -y -vsync 2  -hwaccel cuda -i $outputDir/'$video'        \\
+        -i $outputDir/'$chat'                                        \\
+        -filter_complex hstack                                       \\
+        -c:a copy          -c:v h264_nvenc          -rc-lookahead 20 \\
+        -tune hq -b:v 5M   -bufsize 5M              -maxrate 10M     \\
+        -qmin 0 -bf 3      -b_ref_mode middle       -temporal-aq 1   \\
+        $gcsMountPoint/$gcsBucketName/$channel_name/'$vod' };
+        &printl(q{debug}, qq{\n\n(pogvodbot command):\n$cmd\n\n});
+        return $cmd . $trigger_command;
+    }
+    else {
+        my $trigger_command = qq{ -i $outputDir/'$video'                  \\
+        -i $outputDir/'$chat'                                             \\
+        -filter_complex hstack -preset veryfast -vsync 2                  \\
+        $gcsMountPoint/$gcsBucketName/$channel_name/'$vod' };
+        &printl(q{debug}, qq{\n\n(pogvodbot command):\n$cmd\n\n});
+        return $cmd . $trigger_command;
+    }
+}
+
+sub generate_ratio() {
+    use POSIX;
+    my $fn = shift;
+    my $stream = qx{ffprobe -i $fn 2>&1};
+    my %chat_ratio = (
+        1080 => 422,
+        720  => 280,
+    );
+    if ($stream =~ m/Video\:.*?\s\d{3,4}x(\d{3,4})/) {
+        my $height = $1;
+        if (defined $chat_ratio{$height}) {
+            return ($height, $chat_ratio{$height});
+        }
+        else {
+            my $ratio = floor($height / 2.55);
+            return ($height, $ratio);
+        }
+    }
+    else {
+        #assume 1080 but log what went wrong
+        print "DOH\n\n$stream\n\n" and return (1080, 422);
+    }
+}
+
+sub trim_chat_by() {
+    my $vod  = shift;
+    my $chat = shift;
+    my $duration1 = &duration_to_seconds(&get_video_duration($vod));
+    if ($duration1) {
+	    &printl(q{debug}, qq{VOD has duration of $duration1 seconds\n});
+    }
+    else {
+	    &printl(q{warning}, qq{VOD duration was unable to be determined\n});
+    }
+    my $duration2;
+    if ($chat =~ m/json['"]*$/) {
+        $duration2 = &get_chat_json_duration($chat);
+	if ($duration2) {
+		&printl(q{debug}, qq{Chat has duration of $duration2 seconds, derived from the JSON\n});
+	}
+	else {
+		&printl(q{warning}, qq{Chat duration was unable to be determined from the JSON\n});
+	}
+    }
+    elsif($chat =~ m/mp4['"]*$/) {
+        $duration2 = &duration_to_seconds(&get_video_duration($chat));
+	if ($duration2) {
+		&printl(q{debug}, qq{Chat has duration of $duration2 seconds, derived from the rendered video\n});
+	}
+	else {
+		&printl(q{warning}, qq{Chat duration was unable to be determined from the mp4\n});
+	}
+    }
+    &printl(q{debug}, qq{Determining delta between Duration1(vod), $duration1 and Duration2(chat), $duration2\n});
+    my $diff = &duration_difference($duration2, $duration1);
+    &printl(q{debug}, qq{Got diff $diff\n});
+    return $diff;
+}
+
+sub get_chat_json_duration() {
+    my $chat = shift;
+    my $duration = qx{grep -oP '"end":\\d{4,}' $chat | sed 's/"end"://' | tr -d "\\n"};
+    if (!$duration) {
+        &printl('warning', qq{Searching $chat for "end" did not result in a timestamp\nTrying using Duration...\n});
+        $duration = qx{grep -oP '"duration": "((\\d+h)?(\\d+m)?(\\d+s)?)+"' $chat | sed 's/"duration": //' | tr -d "\\n"};
+        if ($duration =~ m/(\d*)h(\d*)m(\d*)s/) {
+            my $hours = $1;
+            my $minutes = $2;
+            my $seconds = $3;
+            $minutes += ($hours   * 60);
+            $seconds += ($minutes * 60);
+            return $seconds;
+        }
+        else {
+            return q{};
+        }
+    }
+    else {
+        return $duration;
+    }
+}
+
+############################################################################
+
+sub start_headless_chromium() {
+    my $docker;
+    -f qq{$home/bin/docker}          ?
+      $docker = qq{$home/bin/docker} :
+      $docker = q{docker}            ;
+    my ($status, $output, $rc) = &printxl(qq{$docker start peepooemu});
+    if ($status ne 'success') {
+        &printxl(qq{$docker run -d --restart=unless-stopped  --name=peepooemu -p 9229:9222 --cap-add=SYS_ADMIN justinribeiro/chrome-headless});
+        sleep 5;
+    }
+}
+
+sub get_vod_id() {
+    my $channel_name = shift;
+    my $try = shift;
+    $try = 0 if !defined $try;
+    use Log::Log4perl qw(:easy);
+    use WWW::Mechanize::Chrome;
+    Log::Log4perl->easy_init($ERROR);
+    my $url = qq{https://twitch.tv/$channel_name/videos?filter=archives&sort=time};
+    my $js  = q{document.getElementsByClassName("ScTransformWrapper-sc-1wvuch4-1 gMwbGx")[0].firstChild.href.match(/\d{10,}/)[0]};
+
+    Log::Log4perl->easy_init($ERROR);
+    my $mech = WWW::Mechanize::Chrome->new(
+        launch_exe    => q{chromium},
+        headless      => 1,
+        autodie       => 0,
+        host          => q{localhost},
+        port          => 9229,
+    );
+    $mech->allow( javascript => 1 );
+    $mech->get($url);
+    sleep 5;
+
+    my ($vod_id, $type) = $mech->eval($js);
+    print "Got Vod ID $vod_id and Type $type\n";
+    if ($type eq "string") {
+        return $vod_id;
+    }
+    else {
+        if ($try < 10) {
+            print "\nGot $type $vod_id\nTrying again ($try)\n";
+            $try++;
+            &get_vod_id($channel_name, $try);
+        }
+        elsif ($try > 9000) {
+            return undef;
+        }
+        else {
+            &prune_headless_chromium();
+            &start_headless_chromium();
+            &get_vod_id($channel_name, 40000000);
+        }
+    }
+}
+
+sub matches_timestamp() {
+    my $fn = shift;
+    # Matches pretty much any timestamp with a date and time
+    return 1 if $fn =~ m/^([a-zA-Z]{2}+:?)([\W_]?)([a-zA-Z]{2}+:?)([\W_]?)([a-zA-Z]{2,4}+:?)([-_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?([\W_]?)?([a-zA-Z]{2}+:?)?\./;
+    return 0;
+}
+
+sub prune_headless_chromium() {
+    my $docker;
+    -f qq{$home/bin/docker}          ?
+      $docker = qq{$home/bin/docker} :
+      $docker = q{docker}            ;
+    &printxl(qq{$docker container rm -f peepooemu}) if qx{$docker container ls} !~ m/peepooemu/;
+}
+
+sub wait_for_finalization() {
+    my $channel_name = shift;
+    my $cmd = qq{ps aux | grep yt-dlp | grep $channel_name | grep -v grep | tr -d "\n"};
+    while (qx{$cmd}) {
+        &printl(q{notice}, "finalizing VOD recording...\n");
+        sleep 10;
+    }
+    return 1;
+}
+
+################ Google Cloud Storage - Mount, Transfer, Unmount ################
+
+sub transfer() {
+    my $channel_name = shift;
+    my $localPath    = shift;
+    my $localPath_fn = shift;
+    my $transfer_dir = qq{$gcsMountPoint/$gcsBucketName/$channel_name/};
+
+    my $is_mounted = &setup_transient_storage($channel_name);
+    if ($is_mounted) {
+        system(qq{cp $localPath/$localPath_fn $transfer_dir});
+        #&copy_to_gcs(qq{$localPath/$localPath_fn}, $transfer_dir);
+        #&teardown_transient_storage();
+    }
+}
+
+sub get_fn() {
+    my $path = shift;
+    my $filter = shift;
+    if ($filter) {
+        return qx{ls -tr $path | grep $filter | tail -1 | tr -d "\n"};
+    }
+    else {
+        return qx{ls -tr $path | tail -1| tr -d "\n"}
+    }
+}
+
+sub setup_transient_storage() {
+    my $channel_name = shift;
+    if (!-d qq{$gcsMountPoint/$gcsBucketName/$channel_name}) {
+        &printl(q{info}, "Mounting GCS Fuse.");
+
+        &printxl(qq{gcsfuse --key-file $authorization --log-file $gcsLogFile --debug_gcs --debug_fuse --debug_http --implicit-dirs $gcsBucketName $gcsMountPoint});
+        my $is_mounted = qx{ls -l $gcsMountPoint/ | wc -l | tr -d "\n"};
+        if ($is_mounted) {
+            &printl(q{info}, qq{Mounting completed.});
+            return $is_mounted;
+        }
+        else {
+            &printl(q{info}, qq{Failed to mount.});
+            return $is_mounted;
+        }
+    }
+    else {
+        &printl(q{info}, qq{Mount already present.});
+        return 1;
+    }
+}
+
+sub teardown_transient_storage() {
+    return &printxl(qq{umount $gcsMountPoint})
+}
+
+sub copy_to_gcs() {
+    my $source = shift;
+    my $destination = shift;
+    my $options = shift;
+    $destination = $gcsMountPoint unless defined $destination;
+    unless (defined $options && ref($options) eq q{HASH}) {
+        my %o = (
+            bool    =>  qw[ progress preallocate whole-file checksum times ignore-existing],
+            paramd  =>  {
+                q{min-size}         =>  q{100m},
+                q{itemize-changes}  =>  q{%<*c %fSD},
+                q{compress-level}   =>  9,
+            }
+        );
+        $options = \%o;
+    }
+    return &rsync_xfer($source, $destination, $options);
+}
+##################################################################################
+
+sub post_notification() {
+    use WebService::Discord::Webhook;
+    my $channel_name = shift;
+    my $video = shift;
+    my @urls;
+    push @urls, $streams{channel}{gamedazed}{discord};
+    #my $dev_discord_url = $streams{channel}{$channel_name}{discord};
+    #my $personal_discord_url = $streams{channel}{gamedazed}{discord};
+    #foreach my $notification ($dev_discord_url, $personal_discord_url) {
+    #    # testing for definition and non-null before attempting to operate on it
+    #    if (defined $notification) {
+    #        if ($notification) {
+    #            push @urls, $notification;
+    #        }
+    #    }
+    #}
+
+    # gcp
+    #my $storage_bucket_pubDir = qq{https://storage.googleapis.com/$gcsBucketName/$channel_name};
+
+    my $uriTitle = &uri_encode($video);
+    my $clean    = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s[｜\|].*$/i;
+    #my $link = qq{$storage_bucket_pubDir/$uriTitle};
+    $video  =~ s/$clean/$1/;
+    my $notification = qq{$channel_name: $video is ready\n};
+    #my $notification = qq{$video\n$link};
+
+    foreach my $url (@urls) {
+        my $hook = WebService::Discord::Webhook->new( $url );
+        $hook->get();
+        $hook->execute( content => $notification );
+    }
+}
+
+##################################################################################
+
+
 
 $| = 1;
