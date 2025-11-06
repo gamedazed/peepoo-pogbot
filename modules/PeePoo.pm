@@ -36,7 +36,7 @@ package PeePoo;
 use Exporter qw{import};
 use lib q{/usr/local/share/perl/5.30.0};
 our @export = qw{api_call color_code encode_base64 decode_base64 printxl printl log timestamp strip_ws color};
-use Term::ANSIColor (qw{:constants});    #(qw{constants}); # apparently not a thing anymore https://perldoc.perl.org/Term::ANSIColor#COMPATIBILITY )
+use Term::ANSIColor (qw{:constants});
 
 our $verbosity       = q{debug};
 our $logLevel        = q{debug};
@@ -52,29 +52,6 @@ our $gcsMountPoint   =   q{/gdrive};
 our $gcsBucketName   =   q{pub};
 our $gcsLogFile      =   qq{$home/gcsfuse.log};
 our $authorization   =   qq{$home/revod-364904-c9d09a09225b.json};
-our %streams=(
-    channel =>  {
-        lordaethelstan  =>  {
-            userid      =>  q{1665175701},
-            discord     =>  qx{cat $home/.webhook | tr -d "\n"},
-        },
-        aethelworld     =>  {
-            discord     =>  qx{cat $home/.webhook | tr -d "\n"},
-        },
-        gamedazed       =>  {
-            discord     =>  qx{cat $home/personal_server.webhook | tr -d "\n"},
-        },
-        nyanners        =>  {
-            userid      =>  q{82350088}
-        },
-        tobs            =>  {
-            userid      =>  q{598826002}
-        },
-        coqui           =>  {
-            userid      =>  q{633385488}
-        }
-    }
-);
 
 my $authKey = q{};
 my $apiUrl  = q{};
@@ -627,7 +604,7 @@ sub get_chatrender_cmd() {
     my $trigger_command = qq{chatrender }
     . qq{-i $outputDir/'$chatIn' $offset }
     . qq{--ffmpeg-path /mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/ffmpeg.exe }  # Until build option causing chatrender to fail is fixed, see https://github.com/lay295/TwitchDownloader/issues/753
-    . qq{--outline --font-size 17 --skip-drive-waiting }
+    . qq{--outline --font-size 17 --font-family "Calibri" --skip-drive-waiting }
     . qq{-h $height -w $width  }
     . qq{--output $outputDir/'$chatOut'};
     &printl(q{debug}, qq{\n\n(twitchify command):\n$cmd\n\n});
@@ -773,7 +750,7 @@ sub get_vod_id() {
     use WWW::Mechanize::Chrome;
     Log::Log4perl->easy_init($ERROR);
     my $url = qq{https://twitch.tv/$channel_name/videos?filter=archives&sort=time};
-    my $js  = q{document.getElementsByClassName("ScTransformWrapper-sc-1wvuch4-1 gMwbGx")[0].firstChild.href.match(/\d{10,}/)[0]};
+    my $js  = q{document.getElementsByClassName('ScTower-sc-1sjzzes-0')[0].firstChild.firstChild.firstChild.firstChild.firstChild.firstChild.firstChild.href.match(/\d{10,}/)[0]};
 
     Log::Log4perl->easy_init($ERROR);
     my $mech = WWW::Mechanize::Chrome->new(
@@ -906,43 +883,5 @@ sub copy_to_gcs() {
     return &rsync_xfer($source, $destination, $options);
 }
 ##################################################################################
-
-sub post_notification() {
-    use WebService::Discord::Webhook;
-    my $channel_name = shift;
-    my $video = shift;
-    my @urls;
-    push @urls, $streams{channel}{gamedazed}{discord};
-    #my $dev_discord_url = $streams{channel}{$channel_name}{discord};
-    #my $personal_discord_url = $streams{channel}{gamedazed}{discord};
-    #foreach my $notification ($dev_discord_url, $personal_discord_url) {
-    #    # testing for definition and non-null before attempting to operate on it
-    #    if (defined $notification) {
-    #        if ($notification) {
-    #            push @urls, $notification;
-    #        }
-    #    }
-    #}
-
-    # gcp
-    #my $storage_bucket_pubDir = qq{https://storage.googleapis.com/$gcsBucketName/$channel_name};
-
-    my $uriTitle = &uri_encode($video);
-    my $clean    = qr/^.*?\Q$channel_name\E\s?\-\s?(.*)\s[｜\|].*$/i;
-    #my $link = qq{$storage_bucket_pubDir/$uriTitle};
-    $video  =~ s/$clean/$1/;
-    my $notification = qq{$channel_name: $video is ready\n};
-    #my $notification = qq{$video\n$link};
-
-    foreach my $url (@urls) {
-        my $hook = WebService::Discord::Webhook->new( $url );
-        $hook->get();
-        $hook->execute( content => $notification );
-    }
-}
-
-##################################################################################
-
-
 
 $| = 1;
